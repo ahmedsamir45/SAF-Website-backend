@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'rest_framework',  # Django REST Framework
     'activities',  # Custom app for activities
     'corsheaders',  # CORS (Cross-Origin Resource Sharing) headers support
+    'phonenumber_field', # Phone number field support
 ]
 
 MIDDLEWARE = [
