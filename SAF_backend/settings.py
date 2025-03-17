@@ -13,129 +13,126 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
+BASE_DIR = Path(__file__).resolve().parent.parent  # Base directory of the project
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-g*bj+b9n0=$e-ulx9(60ic_h4vuvsp%moy-#$a)6%r3@i!8kt&'
+SECRET_KEY = 'django-insecure-g*bj+b9n0=$e-ulx9(60ic_h4vuvsp%moy-#$a)6%r3@i!8kt&'  # Secret key for cryptographic signing
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = True  # Debug mode (set to False in production)
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = []  # List of allowed hostnames for the application
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'rest_framework',
-    'activities',
-    'corsheaders',  
+    'django.contrib.admin',  # Django admin interface
+    'django.contrib.auth',  # Authentication framework
+    'django.contrib.contenttypes',  # Content type framework
+    'django.contrib.sessions',  # Session management
+    'django.contrib.messages',  # Messaging framework
+    'django.contrib.staticfiles',  # Static file management
+    'rest_framework',  # Django REST Framework
+    'activities',  # Custom app for activities
+    'corsheaders',  # CORS (Cross-Origin Resource Sharing) headers support
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware to handle cross-origin requests
+    'django.middleware.security.SecurityMiddleware',  # Security middleware
+    'django.contrib.sessions.middleware.SessionMiddleware',  # Session middleware
+    'django.middleware.common.CommonMiddleware',  # Common middleware
+    'django.middleware.csrf.CsrfViewMiddleware',  # CSRF protection middleware
+    'django.contrib.auth.middleware.AuthenticationMiddleware',  # Authentication middleware
+    'django.contrib.messages.middleware.MessageMiddleware',  # Messaging middleware
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',  # Clickjacking protection middleware
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True 
-ROOT_URLCONF = 'SAF_backend.urls'
+CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins for CORS (for development only)
+
+ROOT_URLCONF = 'SAF_backend.urls'  # Root URL configuration for the project
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',  # Template backend
+        'DIRS': [],  # Additional template directories
+        'APP_DIRS': True,  # Enable template loading from app directories
         'OPTIONS': {
             'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.debug',  # Debug context processor
+                'django.template.context_processors.request',  # Request context processor
+                'django.contrib.auth.context_processors.auth',  # Authentication context processor
+                'django.contrib.messages.context_processors.messages',  # Messages context processor
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'SAF_backend.wsgi.application'
-
+WSGI_APPLICATION = 'SAF_backend.wsgi.application'  # WSGI application for deployment
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.sqlite3',  # Database engine (SQLite in this case)
+        'NAME': BASE_DIR / 'db.sqlite3',  # Database file path
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',  # Validate password similarity to user attributes
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',  # Validate minimum password length
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',  # Validate against common passwords
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',  # Validate against numeric passwords
     },
 ]
-
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'en-us'  # Default language
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'UTC'  # Default time zone
 
-USE_I18N = True
+USE_I18N = True  # Enable internationalization
 
-USE_TZ = True
-
+USE_TZ = True  # Enable time zone support
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = 'static/'  # URL prefix for static files
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'  # Default primary key field type
 
+# Django REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',  # Session-based authentication
+        'rest_framework.authentication.BasicAuthentication',  # Basic authentication
+        'rest_framework.authentication.TokenAuthentication',  # Token-based authentication
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.IsAuthenticated',  # Require authentication for all API endpoints
     ),
 }
 
-AUTH_USER_MODEL = 'activities.User'
+# Custom user model
+AUTH_USER_MODEL = 'activities.User'  # Use the custom User model from the 'activities' app

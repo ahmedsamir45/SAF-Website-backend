@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib import admin
 from .models import User, Program, Requirement, ProgramRequirement, Favorite, EmailLog, WeeklyEmail, WeeklyUserEmail, ProgramEmail, MessageContact
 
-# تسجيل النماذج في لوحة التحكم
+
 admin.site.register(User)
 admin.site.register(Program)
 admin.site.register(Requirement)
