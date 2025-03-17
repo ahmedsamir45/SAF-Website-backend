@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.timezone import now
+from phonenumber_field.modelfields import PhoneNumberField
 
 # Abstract Base Models
 class BaseModel(models.Model):
@@ -128,11 +129,11 @@ class User(AbstractUser, BaseModel):
     - `phone`: The user's phone number.
     - `date_of_birth`: The user's date of birth.
     """
-    type = models.CharField(max_length=1, choices=UserType.choices, default=UserType.STUDENT)
-    gender = models.CharField(max_length=10, choices=Gender.choices, default=Gender.OTHER)
+    type = models.CharField(max_length=1, choices=UserType.choices, default=UserType.STUDENT, db_index=True) # db_index for faster filtering
+    gender = models.CharField(max_length=10, choices=Gender.choices, default=Gender.OTHER, db_index=True)
     bio = models.TextField(blank=True, null=True)
-    date_enrollment = models.DateField(default=now)
-    phone = models.CharField(max_length=15, blank=True, null=True)
+    date_enrollment = models.DateField(default=now, db_index=True)
+    phone = PhoneNumberField(blank=True, null=True) # better phone number validation
     date_of_birth = models.DateField(blank=True, null=True)
 
     def __repr__(self):
@@ -159,18 +160,24 @@ class Program(BaseModel):
     - `kind`: The kind of program (Job, Internship, Scholarship).
     - `target_academic`: The target academic level (Student, Graduate, Both).
     """
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, db_index=True)
     description = models.TextField()
     cost = models.DecimalField(max_digits=10, decimal_places=2)
-    start_date = models.DateField()
-    end_date = models.DateField()
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(db_index=True)
     post_date = models.DateField(default=now)
     url = models.URLField()
-    type = models.CharField(max_length=50, choices=ProgramType.choices, default=ProgramType.ONLINE)
-    category = models.CharField(max_length=50, choices=ProgramCategory.choices, default=ProgramCategory.TECHNOLOGY)
-    audience = models.CharField(max_length=50, choices=ProgramAudience.choices, default=ProgramAudience.BEGINNER)
+    type = models.CharField(max_length=50, choices=ProgramType.choices, default=ProgramType.ONLINE, db_index=True)
+    category = models.CharField(max_length=50, choices=ProgramCategory.choices, default=ProgramCategory.TECHNOLOGY, db_index=True)
+    audience = models.CharField(max_length=50, choices=ProgramAudience.choices, default=ProgramAudience.BEGINNER, db_index=True)
     kind = models.CharField(max_length=50, choices=ProgramKind.choices, default=ProgramKind.JOB)
     target_academic = models.CharField(max_length=50, choices=TargetAcademic.choices, default=TargetAcademic.BOTH)
+    requirements = models.ManyToManyField('Requirement', related_name='programs') # simplified many-to-many relationship
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(check=models.Q(start_date__lte=models.F('end_date')), name='start_date_lte_end_date') # check comstraint for start_date <= end_date
+        ]
 
     def __repr__(self):
         """Returns a detailed string representation of the Program object."""
@@ -195,31 +202,14 @@ class Requirement(BaseModel):
         """Returns a simple string representation of the Requirement object."""
         return self.description
 
-class ProgramRequirement(BaseModel):
-    """
-    Model representing the relationship between a program and its requirements.
-    - `program`: The program associated with the requirement.
-    - `requirement`: The requirement associated with the program.
-    """
-    program = models.ForeignKey(Program, on_delete=models.CASCADE)
-    requirement = models.ForeignKey(Requirement, on_delete=models.CASCADE)
-
-    def __repr__(self):
-        """Returns a detailed string representation of the ProgramRequirement object."""
-        return f"ProgramRequirement(id={self.id}, program={self.program.title}, requirement={self.requirement.description})"
-
-    def __str__(self):
-        """Returns a simple string representation of the ProgramRequirement object."""
-        return f"{self.program.title} - {self.requirement.description}"
-
 class Favorite(BaseModel):
     """
     Model representing a user's favorite program.
     - `user`: The user who favorited the program.
     - `program`: The program that was favorited.
     """
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    program = models.ForeignKey(Program, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites') #  related_name allows reverse queries like user.favourites.all()
+    program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name='favorites')
 
     def __repr__(self):
         """Returns a detailed string representation of the Favorite object."""
@@ -253,7 +243,10 @@ class WeeklyEmail(BaseModel):
     - `sent_date`: The date the email was sent.
     """
     subject = models.CharField(max_length=255)
-    sent_date = models.DateField(default=now)
+    sent_date = models.DateField(default=now, db_index=True)
+    # simplifies the relationship between emails, users and programs
+    users = models.ManyToManyField(User, related_name='weekly_emails') 
+    programs = models.ManyToManyField(Program, related_name='weekly_emails')
 
     def __repr__(self):
         """Returns a detailed string representation of the WeeklyEmail object."""
@@ -262,40 +255,6 @@ class WeeklyEmail(BaseModel):
     def __str__(self):
         """Returns a simple string representation of the WeeklyEmail object."""
         return self.subject
-
-class WeeklyUserEmail(BaseModel):
-    """
-    Model representing the relationship between a weekly email and a user.
-    - `email`: The weekly email sent to the user.
-    - `user`: The user who received the email.
-    """
-    email = models.ForeignKey(WeeklyEmail, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-
-    def __repr__(self):
-        """Returns a detailed string representation of the WeeklyUserEmail object."""
-        return f"WeeklyUserEmail(id={self.id}, email={self.email.subject}, user={self.user.username})"
-
-    def __str__(self):
-        """Returns a simple string representation of the WeeklyUserEmail object."""
-        return f"{self.email.subject} - {self.user.username}"
-
-class ProgramEmail(BaseModel):
-    """
-    Model representing the relationship between a program and a weekly email.
-    - `email`: The weekly email associated with the program.
-    - `program`: The program associated with the email.
-    """
-    email = models.ForeignKey(WeeklyEmail, on_delete=models.CASCADE)  # Fixed relationship
-    program = models.ForeignKey(Program, on_delete=models.CASCADE)
-
-    def __repr__(self):
-        """Returns a detailed string representation of the ProgramEmail object."""
-        return f"ProgramEmail(id={self.id}, email={self.email.subject}, program={self.program.title})"
-
-    def __str__(self):
-        """Returns a simple string representation of the ProgramEmail object."""
-        return f"{self.email.subject} - {self.program.title}"
 
 class MessageContact(BaseModel):
     """
@@ -307,10 +266,12 @@ class MessageContact(BaseModel):
     - `status`: The status of the message (New, Read, Responded).
     """
     name = models.CharField(max_length=255)
-    email = models.EmailField()
+    email = models.EmailField(db_index=True)
     phone = models.CharField(max_length=15)
     message = models.TextField()
-    status = models.CharField(max_length=50, choices=MessageStatus.choices, default=MessageStatus.NEW)
+    status = models.CharField(max_length=50, choices=MessageStatus.choices, default=MessageStatus.NEW, db_index=True)
+    read_at = models.DateTimeField(blank=True, null=True)
+    responded_at = models.DateTimeField(blank=True, null=True)
 
     def __repr__(self):
         """Returns a detailed string representation of the MessageContact object."""
