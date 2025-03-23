@@ -79,8 +79,12 @@ WSGI_APPLICATION = 'SAF_backend.wsgi.application'  # WSGI application for deploy
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',  # Database engine (SQLite in this case)
-        'NAME': BASE_DIR / 'db.sqlite3',  # Database file path
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'SAF_db',       
+        'USER': 'postgres',           
+        'PASSWORD': 'obie9090',   
+        'HOST': 'localhost',     
+        'PORT': '5432',             
     }
 }
 
