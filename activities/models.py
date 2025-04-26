@@ -118,6 +118,21 @@ class MessageStatus(models.TextChoices):
     READ = 'READ', 'Read'
     RESPONDED = 'RESPONDED', 'Responded'
 
+# Function to define upload paths
+def user_profile_image_path(instance, filename):
+    """
+    Function to define the upload path for user profile images.
+    Format: 'user_profiles/user_id/filename'
+    """
+    return f'user_profiles/{instance.id}/{filename}'
+
+def program_image_path(instance, filename):
+    """
+    Function to define the upload path for program images.
+    Format: 'program_images/program_id/filename'
+    """
+    return f'program_images/{instance.id}/{filename}'
+
 # Models
 class User(AbstractUser, BaseModel):
     """
@@ -128,6 +143,7 @@ class User(AbstractUser, BaseModel):
     - `date_enrollment`: The date the user enrolled.
     - `phone`: The user's phone number.
     - `date_of_birth`: The user's date of birth.
+    - `profile_image`: The user's profile image.
     """
     type = models.CharField(max_length=1, choices=UserType.choices, default=UserType.STUDENT, db_index=True) # db_index for faster filtering
     gender = models.CharField(max_length=10, choices=Gender.choices, default=Gender.OTHER, db_index=True)
@@ -135,6 +151,7 @@ class User(AbstractUser, BaseModel):
     date_enrollment = models.DateField(default=now, db_index=True)
     phone = PhoneNumberField(blank=True, null=True) # better phone number validation
     date_of_birth = models.DateField(blank=True, null=True)
+    profile_image = models.ImageField(upload_to=user_profile_image_path, blank=True, null=True)
 
     def __repr__(self):
         """Returns a detailed string representation of the User object."""
@@ -144,48 +161,7 @@ class User(AbstractUser, BaseModel):
         """Returns a simple string representation of the User object."""
         return self.username
 
-class Program(BaseModel):
-    """
-    Model representing a program.
-    - `title`: The title of the program.
-    - `description`: A detailed description of the program.
-    - `cost`: The cost of the program.
-    - `start_date`: The start date of the program.
-    - `end_date`: The end date of the program.
-    - `post_date`: The date the program was posted.
-    - `url`: The URL for more information about the program.
-    - `type`: The type of program (Online, Offline, Hybrid).
-    - `category`: The category of the program (Technology, Business, Art, Science).
-    - `audience`: The target audience level (Beginner, Intermediate, Advanced).
-    - `kind`: The kind of program (Job, Internship, Scholarship).
-    - `target_academic`: The target academic level (Student, Graduate, Both).
-    """
-    title = models.CharField(max_length=255, db_index=True)
-    description = models.TextField()
-    cost = models.DecimalField(max_digits=10, decimal_places=2)
-    start_date = models.DateField(db_index=True)
-    end_date = models.DateField(db_index=True)
-    post_date = models.DateField(default=now)
-    url = models.URLField()
-    type = models.CharField(max_length=50, choices=ProgramType.choices, default=ProgramType.ONLINE, db_index=True)
-    category = models.CharField(max_length=50, choices=ProgramCategory.choices, default=ProgramCategory.TECHNOLOGY, db_index=True)
-    audience = models.CharField(max_length=50, choices=ProgramAudience.choices, default=ProgramAudience.BEGINNER, db_index=True)
-    kind = models.CharField(max_length=50, choices=ProgramKind.choices, default=ProgramKind.JOB)
-    target_academic = models.CharField(max_length=50, choices=TargetAcademic.choices, default=TargetAcademic.BOTH)
-    requirements = models.ManyToManyField('Requirement', related_name='programs') # simplified many-to-many relationship
 
-    class Meta:
-        constraints = [
-            models.CheckConstraint(check=models.Q(start_date__lte=models.F('end_date')), name='start_date_lte_end_date') # check comstraint for start_date <= end_date
-        ]
-
-    def __repr__(self):
-        """Returns a detailed string representation of the Program object."""
-        return f"Program(id={self.id}, title={self.title}, kind={self.kind})"
-
-    def __str__(self):
-        """Returns a simple string representation of the Program object."""
-        return self.title
 
 class Requirement(BaseModel):
     """
@@ -201,6 +177,78 @@ class Requirement(BaseModel):
     def __str__(self):
         """Returns a simple string representation of the Requirement object."""
         return self.description
+# Then define ProgramRequirement
+class ProgramRequirement(BaseModel):
+    program = models.ForeignKey('Program', on_delete=models.CASCADE)
+    requirement = models.ForeignKey(Requirement, on_delete=models.CASCADE)
+    
+    def __str__(self):
+        return f"{self.program.title} - {self.requirement.description}"
+class Program(BaseModel):
+    """
+    Model representing a program.
+    - `title`: The title of the program.
+    - `description`: A detailed description of the program.
+    - `cost`: The cost of the program.
+    - `start_date`: The start date of the program.
+    - `end_date`: The end date of the program.
+    - `post_date`: The date the program was posted.
+    - `url`: The URL for more information about the program.
+    - `type`: The type of program (Online, Offline, Hybrid).
+    - `category`: The category of the program (Technology, Business, Art, Science).
+    - `audience`: The target audience level (Beginner, Intermediate, Advanced).
+    - `kind`: The kind of program (Job, Internship, Scholarship).
+    - `target_academic`: The target academic level (Student, Graduate, Both).
+    - `image`: The program's featured image.
+    """
+    title = models.CharField(max_length=255, db_index=True)
+    description = models.TextField()
+    cost = models.DecimalField(max_digits=10, decimal_places=2)
+    start_date = models.DateField(db_index=True)
+    end_date = models.DateField(db_index=True)
+    post_date = models.DateField(default=now)
+    url = models.URLField()
+    type = models.CharField(max_length=50, choices=ProgramType.choices, default=ProgramType.ONLINE, db_index=True)
+    category = models.CharField(max_length=50, choices=ProgramCategory.choices, default=ProgramCategory.TECHNOLOGY, db_index=True)
+    audience = models.CharField(max_length=50, choices=ProgramAudience.choices, default=ProgramAudience.BEGINNER, db_index=True)
+    kind = models.CharField(max_length=50, choices=ProgramKind.choices, default=ProgramKind.JOB)
+    target_academic = models.CharField(max_length=50, choices=TargetAcademic.choices, default=TargetAcademic.BOTH)
+    requirements = models.ManyToManyField(Requirement, through='ProgramRequirement', related_name='programs')
+    image = models.ImageField(upload_to=program_image_path, blank=True, null=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(check=models.Q(start_date__lte=models.F('end_date')), name='start_date_lte_end_date') # check comstraint for start_date <= end_date
+        ]
+
+    def __repr__(self):
+        """Returns a detailed string representation of the Program object."""
+        return f"Program(id={self.id}, title={self.title}, kind={self.kind})"
+
+    def __str__(self):
+        """Returns a simple string representation of the Program object."""
+        return self.title
+
+class ProgramImage(BaseModel):
+    """
+    Model representing additional images for a program.
+    - `program`: The program that the image belongs to.
+    - `image`: The additional image for the program.
+    - `caption`: An optional caption for the image.
+    """
+    program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name='additional_images')
+    image = models.ImageField(upload_to=program_image_path)
+    caption = models.CharField(max_length=255, blank=True, null=True)
+
+    def __repr__(self):
+        """Returns a detailed string representation of the ProgramImage object."""
+        return f"ProgramImage(id={self.id}, program={self.program.title})"
+
+    def __str__(self):
+        """Returns a simple string representation of the ProgramImage object."""
+        return f"Image for {self.program.title}"
+
+
 
 class Favorite(BaseModel):
     """
@@ -257,6 +305,7 @@ class WeeklyEmail(BaseModel):
         return self.subject
 
 class MessageContact(BaseModel):
+
     """
     Model representing a contact message.
     - `name`: The name of the person sending the message.
@@ -280,3 +329,6 @@ class MessageContact(BaseModel):
     def __str__(self):
         """Returns a simple string representation of the MessageContact object."""
         return f"{self.name} - {self.status}"
+    
+
+# Add this model
