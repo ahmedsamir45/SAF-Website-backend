@@ -93,7 +93,7 @@ class TargetAcademic(models.TextChoices):
     - BOTH: Represents programs targeted at both students and graduates.
     """
     STUDENT = 'STUDENT', 'Student'
-    GRADUATE = 'GRADUATE', 'Graduate'
+    GRADUATE = 'GRADUATE', 'Graduate' 
     BOTH = 'BOTH', 'Both'
 
 class EmailStatus(models.TextChoices):
