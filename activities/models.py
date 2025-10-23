@@ -1,334 +1,461 @@
+import os
+import shutil
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser, Group, Permission, BaseUserManager
 from django.utils.timezone import now
 from phonenumber_field.modelfields import PhoneNumberField
+from django.core.validators import FileExtensionValidator
+from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
+from django.utils.text import slugify
+from django.urls import reverse
+import uuid
+from django.db.models.signals import post_save, pre_save
+from django.dispatch import receiver
 
-# Abstract Base Models
+
+# -------------------------------------------------------------------
+# Abstract Base Model
+# -------------------------------------------------------------------
 class BaseModel(models.Model):
-    """
-    Abstract base model that provides common fields for all models.
-    - `created_at`: Automatically set to the current date and time when the object is created.
-    - `updated_at`: Automatically updated to the current date and time whenever the object is saved.
-    """
+    """Common abstract base model with created/updated timestamps."""
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        abstract = True  # This makes BaseModel an abstract class, so it won't create a database table.
+        abstract = True
+        ordering = ['-created_at']
 
-# Enums for choices
+
+# -------------------------------------------------------------------
+# Contact Message Model
+# -------------------------------------------------------------------
+class ContactMessage(BaseModel):
+    """Stores contact messages from users."""
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    subject = models.CharField(max_length=200, blank=True, null=True)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Message from {self.name} ({self.email})"
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Contact Message"
+        verbose_name_plural = "Contact Messages"
+
+
+# -------------------------------------------------------------------
+# Enums
+# -------------------------------------------------------------------
 class UserType(models.TextChoices):
-    """
-    Enum for user types.
-    - STUDENT: Represents a student user.
-    - TEACHER: Represents a teacher user.
-    - ADMIN: Represents an admin user.
-    """
     STUDENT = 'S', 'Student'
     TEACHER = 'T', 'Teacher'
     ADMIN = 'A', 'Admin'
 
+
 class Gender(models.TextChoices):
-    """
-    Enum for gender choices.
-    - MALE: Represents male gender.
-    - FEMALE: Represents female gender.
-    - OTHER: Represents other gender.
-    """
     MALE = 'M', 'Male'
     FEMALE = 'F', 'Female'
     OTHER = 'O', 'Other'
 
+
 class ProgramType(models.TextChoices):
-    """
-    Enum for program types.
-    - ONLINE: Represents an online program.
-    - OFFLINE: Represents an offline program.
-    - HYBRID: Represents a hybrid program (both online and offline).
-    """
     ONLINE = 'ON', 'Online'
     OFFLINE = 'OFF', 'Offline'
     HYBRID = 'HY', 'Hybrid'
 
+
 class ProgramCategory(models.TextChoices):
-    """
-    Enum for program categories.
-    - TECHNOLOGY: Represents technology-related programs.
-    - BUSINESS: Represents business-related programs.
-    - ART: Represents art-related programs.
-    - SCIENCE: Represents science-related programs.
-    """
     TECHNOLOGY = 'TECH', 'Technology'
     BUSINESS = 'BUS', 'Business'
     ART = 'ART', 'Art'
     SCIENCE = 'SCI', 'Science'
 
+
 class ProgramAudience(models.TextChoices):
-    """
-    Enum for program audience levels.
-    - BEGINNER: Represents programs for beginners.
-    - INTERMEDIATE: Represents programs for intermediate users.
-    - ADVANCED: Represents programs for advanced users.
-    """
     BEGINNER = 'BEG', 'Beginner'
     INTERMEDIATE = 'INT', 'Intermediate'
     ADVANCED = 'ADV', 'Advanced'
 
+
 class ProgramKind(models.TextChoices):
-    """
-    Enum for program kinds.
-    - JOB: Represents job-related programs.
-    - INTERN: Represents internship programs.
-    - SCHOLAR: Represents scholarship programs.
-    """
     JOB = 'JOB', 'Job'
     INTERN = 'INTERN', 'Internship'
     SCHOLAR = 'SCHOLAR', 'Scholarship'
 
+
 class TargetAcademic(models.TextChoices):
-    """
-    Enum for target academic levels.
-    - STUDENT: Represents programs targeted at students.
-    - GRADUATE: Represents programs targeted at graduates.
-    - BOTH: Represents programs targeted at both students and graduates.
-    """
     STUDENT = 'STUDENT', 'Student'
     GRADUATE = 'GRADUATE', 'Graduate'
     BOTH = 'BOTH', 'Both'
 
+
 class EmailStatus(models.TextChoices):
-    """
-    Enum for email statuses.
-    - SENT: Represents emails that have been sent.
-    - FAILED: Represents emails that failed to send.
-    - PENDING: Represents emails that are pending to be sent.
-    """
     SENT = 'SENT', 'Sent'
     FAILED = 'FAILED', 'Failed'
     PENDING = 'PENDING', 'Pending'
 
-class MessageStatus(models.TextChoices):
-    """
-    Enum for message statuses.
-    - NEW: Represents new messages.
-    - READ: Represents messages that have been read.
-    - RESPONDED: Represents messages that have been responded to.
-    """
-    NEW = 'NEW', 'New'
-    READ = 'READ', 'Read'
-    RESPONDED = 'RESPONDED', 'Responded'
 
-# Function to define upload paths
+# -------------------------------------------------------------------
+# Category & Blog Models
+# -------------------------------------------------------------------
+class Category(BaseModel):
+    """Represents a blog category."""
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = 'Categories'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+
+class BlogPost(BaseModel):
+    """Represents a blog post."""
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+    ]
+
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=200, unique_for_date='published_at')
+    content = models.TextField()
+    excerpt = models.TextField(max_length=500, blank=True)
+    author = models.ForeignKey('User', on_delete=models.CASCADE, related_name='blog_posts')
+    categories = models.ManyToManyField(Category, related_name='blog_posts', blank=True)
+    featured_image = models.ImageField(
+        upload_to='blog/images/%Y/%m/%d/',
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif', 'webp'])]
+    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+    published_at = models.DateTimeField(null=True, blank=True)
+    view_count = models.PositiveIntegerField(default=0)
+    allow_comments = models.BooleanField(default=True)
+    seo_title = models.CharField(max_length=200, blank=True)
+    seo_description = models.TextField(blank=True)
+    seo_keywords = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ['-published_at']
+        get_latest_by = 'published_at'
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.title)
+        if self.status == 'published' and not self.published_at:
+            self.published_at = timezone.now()
+        if not self.excerpt:
+            self.excerpt = (self.content[:500] + '...') if len(self.content) > 500 else self.content
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse('blog:post_detail', kwargs={'slug': self.slug})
+
+
+# -------------------------------------------------------------------
+# Newsletter Subscription
+# -------------------------------------------------------------------
+class NewsletterSubscription(BaseModel):
+    """Newsletter subscriber."""
+    email = models.EmailField(unique=True, db_index=True)
+    is_active = models.BooleanField(default=False)
+    confirmation_code = models.UUIDField(default=uuid.uuid4, editable=False)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    unsubscribed_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Newsletter Subscription"
+        verbose_name_plural = "Newsletter Subscriptions"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.email
+
+    def confirm(self):
+        self.is_active = True
+        self.confirmed_at = timezone.now()
+        self.save(update_fields=['is_active', 'confirmed_at'])
+
+    def unsubscribe(self):
+        self.is_active = False
+        self.unsubscribed_at = timezone.now()
+        self.save(update_fields=['is_active', 'unsubscribed_at'])
+
+
+# -------------------------------------------------------------------
+# Upload paths
+# -------------------------------------------------------------------
 def user_profile_image_path(instance, filename):
-    """
-    Function to define the upload path for user profile images.
-    Format: 'user_profiles/user_id/filename'
-    """
     return f'user_profiles/{instance.id}/{filename}'
+
 
 def program_image_path(instance, filename):
     """
-    Function to define the upload path for program images.
-    Format: 'program_images/program_id/filename'
+    Return the path for program images.
+    If the instance doesn't have an ID yet (new instance), use a temporary path.
     """
-    return f'program_images/{instance.id}/{filename}'
+    # Get file extension
+    ext = filename.split('.')[-1]
+    # Create a unique filename using UUID
+    unique_filename = f"{uuid.uuid4()}.{ext}"
+    
+    if not instance.pk:  # If the instance hasn't been saved yet
+        # Use a temporary directory with a timestamp
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        return f'program_images/temp/{timestamp}_{unique_filename}'
+    return f'program_images/program_{instance.id}/{unique_filename}'
 
-# Models
+# -------------------------------------------------------------------
+# Custom User Manager
+# -------------------------------------------------------------------
+class UserManager(BaseUserManager):
+    """Custom user model manager where email is the unique identifier for authentication."""
+    
+    def create_user(self, email, password=None, **extra_fields):
+        """Create and save a user with the given email and password."""
+        if not email:
+            raise ValueError(_('The Email must be set'))
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        """Create and save a SuperUser with the given email and password."""
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('is_verified', True)
+        
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError(_('Superuser must have is_staff=True.'))
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError(_('Superuser must have is_superuser=True.'))
+            
+        return self.create_user(email, password, **extra_fields)
+
+
+# -------------------------------------------------------------------
+# User Model
+# -------------------------------------------------------------------
 class User(AbstractUser, BaseModel):
-    """
-    Custom user model that extends Django's AbstractUser and BaseModel.
-    - `type`: The type of user (Student, Teacher, Admin).
-    - `gender`: The gender of the user.
-    - `bio`: A short biography of the user.
-    - `date_enrollment`: The date the user enrolled.
-    - `phone`: The user's phone number.
-    - `date_of_birth`: The user's date of birth.
-    - `profile_image`: The user's profile image.
-    """
-    type = models.CharField(max_length=1, choices=UserType.choices, default=UserType.STUDENT, db_index=True) # db_index for faster filtering
-    gender = models.CharField(max_length=10, choices=Gender.choices, default=Gender.OTHER, db_index=True)
+    username = None
+    email = models.EmailField(_('email address'), unique=True)
+    type = models.CharField(max_length=1, choices=UserType.choices, default=UserType.STUDENT)
+    gender = models.CharField(max_length=10, choices=Gender.choices, default=Gender.OTHER)
     bio = models.TextField(blank=True, null=True)
-    date_enrollment = models.DateField(default=now, db_index=True)
-    phone = PhoneNumberField(blank=True, null=True) # better phone number validation
+    date_enrollment = models.DateField(default=now)
+    phone = PhoneNumberField(blank=True, null=True)
     date_of_birth = models.DateField(blank=True, null=True)
-    profile_image = models.ImageField(upload_to=user_profile_image_path, blank=True, null=True)
+    profile_image = models.ImageField(
+        upload_to=user_profile_image_path,
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'gif'])]
+    )
+    is_verified = models.BooleanField(default=False)
+    email_notifications = models.BooleanField(default=True)
+    
+    groups = models.ManyToManyField(
+        Group,
+        blank=True,
+        related_name='saf_user_groups',
+        related_query_name='user',
+    )
+    user_permissions = models.ManyToManyField(
+        Permission,
+        blank=True,
+        related_name='saf_user_permissions',
+        related_query_name='user',
+    )
 
-    def __repr__(self):
-        """Returns a detailed string representation of the User object."""
-        return f"User(id={self.id}, username={self.username}, type={self.type})"
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['first_name', 'last_name']
+    
+    objects = UserManager()
 
     def __str__(self):
-        """Returns a simple string representation of the User object."""
-        return self.username
+        return self.email
+
+    class Meta:
+        db_table = 'auth_user'
+        verbose_name = 'User'
+        verbose_name_plural = 'Users'
 
 
-
+# -------------------------------------------------------------------
+# Program Models
+# -------------------------------------------------------------------
 class Requirement(BaseModel):
-    """
-    Model representing a requirement for a program.
-    - `description`: A description of the requirement.
-    """
     description = models.CharField(max_length=255)
 
-    def __repr__(self):
-        """Returns a detailed string representation of the Requirement object."""
-        return f"Requirement(id={self.id}, description={self.description})"
-
     def __str__(self):
-        """Returns a simple string representation of the Requirement object."""
         return self.description
-# Then define ProgramRequirement
-class ProgramRequirement(BaseModel):
-    program = models.ForeignKey('Program', on_delete=models.CASCADE)
-    requirement = models.ForeignKey(Requirement, on_delete=models.CASCADE)
-    
-    def __str__(self):
-        return f"{self.program.title} - {self.requirement.description}"
+
+
 class Program(BaseModel):
-    """
-    Model representing a program.
-    - `title`: The title of the program.
-    - `description`: A detailed description of the program.
-    - `cost`: The cost of the program.
-    - `start_date`: The start date of the program.
-    - `end_date`: The end date of the program.
-    - `post_date`: The date the program was posted.
-    - `url`: The URL for more information about the program.
-    - `type`: The type of program (Online, Offline, Hybrid).
-    - `category`: The category of the program (Technology, Business, Art, Science).
-    - `audience`: The target audience level (Beginner, Intermediate, Advanced).
-    - `kind`: The kind of program (Job, Internship, Scholarship).
-    - `target_academic`: The target academic level (Student, Graduate, Both).
-    - `image`: The program's featured image.
-    """
-    title = models.CharField(max_length=255, db_index=True)
+    title = models.CharField(max_length=255)
     description = models.TextField()
     cost = models.DecimalField(max_digits=10, decimal_places=2)
-    start_date = models.DateField(db_index=True)
-    end_date = models.DateField(db_index=True)
+    start_date = models.DateField()
+    end_date = models.DateField()
     post_date = models.DateField(default=now)
     url = models.URLField()
-    type = models.CharField(max_length=50, choices=ProgramType.choices, default=ProgramType.ONLINE, db_index=True)
-    category = models.CharField(max_length=50, choices=ProgramCategory.choices, default=ProgramCategory.TECHNOLOGY, db_index=True)
-    audience = models.CharField(max_length=50, choices=ProgramAudience.choices, default=ProgramAudience.BEGINNER, db_index=True)
+    type = models.CharField(max_length=50, choices=ProgramType.choices, default=ProgramType.ONLINE)
+    category = models.CharField(max_length=50, choices=ProgramCategory.choices, default=ProgramCategory.TECHNOLOGY)
+    audience = models.CharField(max_length=50, choices=ProgramAudience.choices, default=ProgramAudience.BEGINNER)
     kind = models.CharField(max_length=50, choices=ProgramKind.choices, default=ProgramKind.JOB)
     target_academic = models.CharField(max_length=50, choices=TargetAcademic.choices, default=TargetAcademic.BOTH)
     requirements = models.ManyToManyField(Requirement, through='ProgramRequirement', related_name='programs')
     image = models.ImageField(upload_to=program_image_path, blank=True, null=True)
+    is_featured = models.BooleanField(default=False)
+    _old_image = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.pk:
+            self._old_image = self.image
+
+    def save(self, *args, **kwargs):
+        # Check if this is a new instance or if the image has changed
+        is_new = not self.pk
+        image_changed = not is_new and self._old_image != self.image
+        
+        # Save the instance first to get an ID
+        super().save(*args, **kwargs)
+        
+        # If this is an existing instance and the image has changed, delete the old image
+        if not is_new and image_changed and self._old_image:
+            self._delete_file(self._old_image)
+        
+        # If there's an image in the temp directory, move it to the final location
+        if self.image and 'temp' in self.image.name:
+            self._move_temp_file()
+    
+    def delete(self, *args, **kwargs):
+        """Delete the model instance and its associated files."""
+        # Delete the image file before deleting the model
+        if self.image:
+            self._delete_file(self.image)
+        super().delete(*args, **kwargs)
+    
+    def _move_temp_file(self):
+        """Move a file from the temp directory to its final location."""
+        if not self.image or not self.pk:
+            return
+            
+        old_path = self.image.path
+        filename = os.path.basename(self.image.name)
+        new_relative_path = f'program_images/program_{self.id}/{filename}'
+        new_path = os.path.join(settings.MEDIA_ROOT, new_relative_path)
+        
+        try:
+            # Create the target directory if it doesn't exist
+            os.makedirs(os.path.dirname(new_path), exist_ok=True)
+            
+            # Move the file
+            shutil.move(old_path, new_path)
+            
+            # Update the image field
+            self.image.name = new_relative_path
+            # Use update_fields to prevent recursive save
+            Program.objects.filter(pk=self.pk).update(image=new_relative_path)
+            
+            # Remove the old directory if it's empty
+            try:
+                os.rmdir(os.path.dirname(old_path))
+            except OSError:
+                pass  # Directory not empty or already deleted
+                
+        except Exception as e:
+            print(f"Error moving file: {e}")
+    
+    def _delete_file(self, file_field):
+        """Delete the file if it exists."""
+        if file_field and hasattr(file_field, 'storage') and hasattr(file_field, 'path'):
+            try:
+                file_path = file_field.path
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+                    # Try to remove the directory if it's empty
+                    try:
+                        os.rmdir(os.path.dirname(file_path))
+                    except OSError:
+                        pass  # Directory not empty or already deleted
+            except Exception as e:
+                print(f"Error deleting file: {e}")
 
     class Meta:
         constraints = [
-            models.CheckConstraint(check=models.Q(start_date__lte=models.F('end_date')), name='start_date_lte_end_date') # check comstraint for start_date <= end_date
+            models.CheckConstraint(check=models.Q(start_date__lte=models.F('end_date')), name='start_date_lte_end_date')
         ]
 
-    def __repr__(self):
-        """Returns a detailed string representation of the Program object."""
-        return f"Program(id={self.id}, title={self.title}, kind={self.kind})"
-
     def __str__(self):
-        """Returns a simple string representation of the Program object."""
         return self.title
 
+
+class ProgramRequirement(BaseModel):
+    program = models.ForeignKey(Program, on_delete=models.CASCADE)
+    requirement = models.ForeignKey(Requirement, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.program.title} - {self.requirement.description}"
+
+
 class ProgramImage(BaseModel):
-    """
-    Model representing additional images for a program.
-    - `program`: The program that the image belongs to.
-    - `image`: The additional image for the program.
-    - `caption`: An optional caption for the image.
-    """
     program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name='additional_images')
     image = models.ImageField(upload_to=program_image_path)
     caption = models.CharField(max_length=255, blank=True, null=True)
 
-    def __repr__(self):
-        """Returns a detailed string representation of the ProgramImage object."""
-        return f"ProgramImage(id={self.id}, program={self.program.title})"
-
     def __str__(self):
-        """Returns a simple string representation of the ProgramImage object."""
         return f"Image for {self.program.title}"
 
 
-
 class Favorite(BaseModel):
-    """
-    Model representing a user's favorite program.
-    - `user`: The user who favorited the program.
-    - `program`: The program that was favorited.
-    """
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites') #  related_name allows reverse queries like user.favourites.all()
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
     program = models.ForeignKey(Program, on_delete=models.CASCADE, related_name='favorites')
 
-    def __repr__(self):
-        """Returns a detailed string representation of the Favorite object."""
-        return f"Favorite(id={self.id}, user={self.user.username}, program={self.program.title})"
-
     def __str__(self):
-        """Returns a simple string representation of the Favorite object."""
-        return f"{self.user.username} - {self.program.title}"
+        return f"{self.user.email} - {self.program.title}"
 
+
+# -------------------------------------------------------------------
+# Email Tracking Models
+# -------------------------------------------------------------------
 class EmailLog(BaseModel):
-    """
-    Model representing an email log.
-    - `status`: The status of the email (Sent, Failed, Pending).
-    - `timestamp`: The timestamp when the email was logged.
-    """
     status = models.CharField(max_length=50, choices=EmailStatus.choices, default=EmailStatus.PENDING)
     timestamp = models.DateTimeField(auto_now_add=True)
 
-    def __repr__(self):
-        """Returns a detailed string representation of the EmailLog object."""
-        return f"EmailLog(id={self.id}, status={self.status}, timestamp={self.timestamp})"
-
     def __str__(self):
-        """Returns a simple string representation of the EmailLog object."""
         return f"EmailLog {self.id} - {self.status}"
 
+
 class WeeklyEmail(BaseModel):
-    """
-    Model representing a weekly email.
-    - `subject`: The subject of the email.
-    - `sent_date`: The date the email was sent.
-    """
     subject = models.CharField(max_length=255)
-    sent_date = models.DateField(default=now, db_index=True)
-    # simplifies the relationship between emails, users and programs
-    users = models.ManyToManyField(User, related_name='weekly_emails') 
+    sent_date = models.DateField(default=now)
+    users = models.ManyToManyField(User, related_name='weekly_emails')
     programs = models.ManyToManyField(Program, related_name='weekly_emails')
 
-    def __repr__(self):
-        """Returns a detailed string representation of the WeeklyEmail object."""
-        return f"WeeklyEmail(id={self.id}, subject={self.subject}, sent_date={self.sent_date})"
-
     def __str__(self):
-        """Returns a simple string representation of the WeeklyEmail object."""
         return self.subject
-
-class MessageContact(BaseModel):
-
-    """
-    Model representing a contact message.
-    - `name`: The name of the person sending the message.
-    - `email`: The email of the person sending the message.
-    - `phone`: The phone number of the person sending the message.
-    - `message`: The content of the message.
-    - `status`: The status of the message (New, Read, Responded).
-    """
-    name = models.CharField(max_length=255)
-    email = models.EmailField(db_index=True)
-    phone = models.CharField(max_length=15)
-    message = models.TextField()
-    status = models.CharField(max_length=50, choices=MessageStatus.choices, default=MessageStatus.NEW, db_index=True)
-    read_at = models.DateTimeField(blank=True, null=True)
-    responded_at = models.DateTimeField(blank=True, null=True)
-
-    def __repr__(self):
-        """Returns a detailed string representation of the MessageContact object."""
-        return f"MessageContact(id={self.id}, name={self.name}, status={self.status})"
-
-    def __str__(self):
-        """Returns a simple string representation of the MessageContact object."""
-        return f"{self.name} - {self.status}"
-    
-
-# Add this model

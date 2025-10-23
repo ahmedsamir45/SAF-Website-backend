@@ -6,7 +6,7 @@ from .models import (
     Favorite, 
     EmailLog, 
     WeeklyEmail, 
-    MessageContact,
+    ContactMessage,
     ProgramImage , # Add this if you want to manage program images in admin
     ProgramRequirement
 )
@@ -18,6 +18,6 @@ admin.site.register(Requirement)
 admin.site.register(Favorite)
 admin.site.register(EmailLog)
 admin.site.register(WeeklyEmail)
-admin.site.register(MessageContact)
+admin.site.register(ContactMessage)
 admin.site.register(ProgramImage)  # Add this if needed
 admin.site.register(ProgramRequirement)
