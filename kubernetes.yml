@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: saf-backend
-        image: your-registry/saf-backend:latest
+        image: your-registry/saf-backend:latest  # Update this with your actual image path
         ports:
         - containerPort: 8000
         env:
@@ -33,9 +33,13 @@ spec:
               name: saf-secrets
               key: database-url
         - name: ALLOWED_HOSTS
-          value: "*"
+          value: "saf-website-backend-backend-only-f6d2c1c.kuberns.cloud,localhost,127.0.0.1"
         - name: DB_SSL
           value: "true"
+        - name: CSRF_TRUSTED_ORIGINS
+          value: "https://saf-website-backend-backend-only-f6d2c1c.kuberns.cloud"
+        - name: CORS_ALLOWED_ORIGINS
+          value: "https://saf-website-backend-backend-only-f6d2c1c.kuberns.cloud"
         resources:
           requests:
             cpu: "100m"
@@ -87,7 +91,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
-  - host: your-domain.com
+  - host: saf-website-backend-backend-only-f6d2c1c.kuberns.cloud
     http:
       paths:
       - path: /

@@ -54,7 +54,21 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_REFERRER_POLICY = 'same-origin'
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', '').split(',') if os.getenv('CORS_ALLOWED_ORIGINS') else []
+# CSRF and CORS settings
+# Allow Kuberns subdomain and local development
+DEFAULT_CSRF_ORIGINS = [
+    'https://saf-website-backend-backend-only-f6d2c1c.kuberns.cloud',
+    'http://localhost',
+    'http://127.0.0.1',
+]
+DEFAULT_CORS_ORIGINS = [
+    'https://saf-website-backend-backend-only-f6d2c1c.kuberns.cloud',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', ','.join(DEFAULT_CSRF_ORIGINS)).split(',')
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', ','.join(DEFAULT_CORS_ORIGINS)).split(',')
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -285,19 +299,21 @@ USE_I18N = True
 USE_TZ = True
 
 # -------------------------------------------------------------------
-# STATIC & MEDIA FILES
-# -------------------------------------------------------------------
-STATIC_URL = '/static/'
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/5.0/howto/static-files/
+
+STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
-# Enable WhiteNoise for serving static files
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Create static directory if it doesn't exist
+os.makedirs(os.path.join(BASE_DIR, 'static'), exist_ok=True)
 
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Create media directory if it doesn't exist
 # Ensure the media directory exists
 os.makedirs(MEDIA_ROOT, exist_ok=True)
 
