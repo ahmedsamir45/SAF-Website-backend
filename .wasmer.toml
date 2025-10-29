@@ -4,9 +4,18 @@ version = "0.1.0"
 description = "SAF Backend API"
 
 [dependencies]
+python = "^3.11"
+
+[build]
+command = "pip install --user -r requirements.txt && python manage.py collectstatic --noinput"
+
+[build.environment]
+PYTHONUNBUFFERED = "1"
+PYTHONDONTWRITEBYTECODE = "1"
+PYTHONPATH = "/app"
 
 [command]
-start = "gunicorn --bind 0.0.0.0:8000 SAF_backend.wsgi:application"
+start = "gunicorn --bind 0.0.0.0:8000 --workers 3 SAF_backend.wsgi:application"
 
 [fs]
 # Include all files in the project directory
@@ -17,26 +26,22 @@ start = "gunicorn --bind 0.0.0.0:8000 SAF_backend.wsgi:application"
 "!**/*.pyc"
 "!**/*.pyo"
 "!**/*.pyd"
-"!.git"
-"!.gitignore"
-"!venv"
-"!env"
-"!.env"
-"!.vscode"
-"!.idea"
-"!*.sqlite3"
-"!db.sqlite3"
-
-[build]
-command = "pip install -r requirements.txt && python manage.py collectstatic --noinput"
-
-[build.environment]
-PYTHONUNBUFFERED = "1"
-PYTHONDONTWRITEBYTECODE = "1"
+"!**/.git"
+"!**/.gitignore"
+"!**/venv"
+"!**/env"
+"!**/.env"
+"!**/.vscode"
+"!**/.idea"
+"!**/*.sqlite3"
+"!**/db.sqlite3"
+"!**/Dockerfile"
+"!**/docker-compose.*"
 
 [environment]
 DEBUG = "0"
 ALLOWED_HOSTS = "*"
+PYTHONPATH = "/app"
 
 [healthcheck]
 http = "/health/"
@@ -59,3 +64,4 @@ DATABASE_URL = { required = true, description = "PostgreSQL database URL" }
 SECRET_KEY = { required = true, description = "Django secret key" }
 DEBUG = { default = "0", description = "Enable debug mode (0 or 1)" }
 ALLOWED_HOSTS = { default = "*", description = "Comma-separated list of allowed hosts" }
+DJANGO_SETTINGS_MODULE = { default = "SAF_backend.settings", description = "Django settings module" }

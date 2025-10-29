@@ -11,6 +11,7 @@ dj-database-url==2.1.0
 djangorestframework-simplejwt==5.5.0
 djoser==2.3.1
 python-jose[cryptography]==3.3.0
+PyJWT==2.8.0
 
 # API Documentation
 drf-yasg==1.21.7
@@ -36,14 +37,10 @@ gunicorn==22.0.0
 sendgrid==6.11.0
 
 # Security
-python-dotenv==1.1.0
 cryptography==44.0.2
 
 # ASGI
 uvicorn==0.29.0
-
-# Production Monitoring
-sentry-sdk==2.10.0
 requests-oauthlib==2.0.0
 rpds-py==0.28.0
 six==1.17.0
