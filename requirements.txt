@@ -17,6 +17,7 @@ PyJWT==2.8.0
 # API Documentation
 drf-yasg==1.21.7
 drf-spectacular==0.26.3
+rest_framework_nested==0.93.4  # For nested routers support
 
 # CORS
 django-cors-headers==4.3.1
