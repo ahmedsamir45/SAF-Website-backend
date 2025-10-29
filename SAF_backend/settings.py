@@ -72,7 +72,7 @@ INSTALLED_APPS = [
     'djoser',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
-    'drf_spectacular',  # For API documentation
+    'drf_yasg',  # For API documentation
     'django_filters',
 
     # Local apps
@@ -267,36 +267,14 @@ FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 # EMAIL CONFIGURATION
 # -------------------------------------------------------------------
 # Email Configuration
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
-SERVER_EMAIL = DEFAULT_FROM_EMAIL
-
-# Debug email settings
-print("\nEmail Configuration:")
-print(f"EMAIL_BACKEND: {EMAIL_BACKEND}")
-print(f"EMAIL_HOST: {EMAIL_HOST}")
-print(f"EMAIL_PORT: {EMAIL_PORT}")
-print(f"EMAIL_USE_TLS: {EMAIL_USE_TLS}")
-print(f"EMAIL_HOST_USER: {EMAIL_HOST_USER}")
-print(f"DEFAULT_FROM_EMAIL: {DEFAULT_FROM_EMAIL}")
-
-# Admin email (for error reporting)
-ADMINS = [
-    ('Admin', os.getenv('ADMIN_EMAIL', 'admin@yourdomain.com')),
-]
-
-# For testing purposes, you can use console backend in development
-# To test real email sending, set SEND_REAL_EMAILS=True in your .env file
-if DEBUG and not os.getenv('SEND_REAL_EMAILS', '').lower() == 'true':
-    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-    print("Using console email backend. To enable real email sending, set SEND_REAL_EMAILS=True in .env")
-
-ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@example.com')
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@yourdomain.com')
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@example.com')  # Add this line
 
 # -------------------------------------------------------------------
 # DEFAULTS

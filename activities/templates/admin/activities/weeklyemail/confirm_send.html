@@ -1,0 +1,92 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static "admin/css/forms.css" %}">
+<style>
+    .confirmation-dialog {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #fff;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .confirmation-header {
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .confirmation-content {
+        margin: 20px 0;
+        padding: 20px;
+        background: #f8f8f8;
+        border-left: 4px solid #79aec8;
+    }
+    .confirmation-actions {
+        margin-top: 30px;
+        text-align: right;
+    }
+    .confirmation-actions .button {
+        margin-left: 10px;
+    }
+    .email-preview {
+        margin-top: 20px;
+        border: 1px solid #ddd;
+        padding: 15px;
+        background: #f9f9f9;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="confirmation-dialog">
+    <div class="confirmation-header">
+        <h1>{% trans 'Are you sure you want to send this email?' %}</h1>
+    </div>
+    
+    <div class="confirmation-content">
+        <h2>{{ object.subject }}</h2>
+        <p>
+            <strong>{% trans 'Scheduled for:' %}</strong> 
+            {{ object.scheduled_for|default:"Now" }}
+        </p>
+        <p>
+            <strong>{% trans 'Recipients:' %}</strong> 
+            {{ subscribers_count }} {% trans 'subscriber' %}{{ subscribers_count|pluralize }}
+        </p>
+        
+        <div class="email-preview">
+            <h4>{% trans 'Email Preview:' %}</h4>
+            <div>
+                {{ object.content|safe|truncatewords_html:50 }}
+                {% if object.programs.exists %}
+                    <hr>
+                    <p><strong>{% trans 'Featured Programs:' %}</strong></p>
+                    <ul>
+                        {% for program in object.programs.all %}
+                            <li>{{ program.title }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <form method="post" action="?send_now=1">
+        {% csrf_token %}
+        <input type="hidden" name="confirm_send" value="1">
+        <div class="confirmation-actions">
+            <a href="{% url 'admin:activities_weeklyemail_changelist' %}" class="button cancel-link">
+                {% trans "No, take me back" %}
+            </a>
+            <button type="submit" class="button" style="background: #79aec8; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer;">
+                {% trans 'Yes, send now' %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
