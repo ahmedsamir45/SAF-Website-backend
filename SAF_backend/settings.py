@@ -9,7 +9,7 @@ import os
 from dotenv import load_dotenv
 
 # Port configuration
-PORT = os.environ.get('PORT', '12083')  # Default to 12083 if not set
+PORT = os.environ.get('PORT', '8000')  # Default to 12083 if not set
 
 # Try to import dj_database_url, but don't fail if it's not installed
 try:
@@ -44,7 +44,7 @@ DEFAULT_URL = 'http://127.0.0.1:8000' if DEBUG else 'https://yourdomain.com'
 BASE_URL = os.getenv('BASE_URL', DEFAULT_URL)
 
 # Parse ALLOWED_HOSTS from environment variable or default to all
-ALLOWED_HOSTS = ['127.0.0.1', '.wasmer.app']
+ALLOWED_HOSTS = ['*', '.koyeb.app']
 # -------------------------------------------------------------------
 # CORS SETTINGS
 # -------------------------------------------------------------------
@@ -63,10 +63,9 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_REFERRER_POLICY = 'same-origin'
-# CSRF and CORS settings
-# Allow Kuberns subdomain and local development
+
 DEFAULT_CSRF_ORIGINS = [
-    'https://saf-website-backend-backend-only-f6d2c1c.kuberns.cloud',
+    '*',
     'http://localhost',
     'http://127.0.0.1',
 ]
@@ -76,7 +75,10 @@ DEFAULT_CORS_ORIGINS = [
     'http://127.0.0.1:3000',
 ]
 
-CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', ','.join(DEFAULT_CSRF_ORIGINS)).split(',')
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.koyeb.app',
+]
+
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', ','.join(DEFAULT_CORS_ORIGINS)).split(',')
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
