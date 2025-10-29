@@ -5,6 +5,7 @@ description = "SAF Backend API"
 
 [dependencies]
 python = "^3.11"
+wasmer = "^4.0"
 
 [build]
 command = "pip install --user -r requirements.txt && python manage.py collectstatic --noinput"
@@ -15,7 +16,7 @@ PYTHONDONTWRITEBYTECODE = "1"
 PYTHONPATH = "/app"
 
 [command]
-start = "gunicorn --bind 0.0.0.0:8000 --workers 3 SAF_backend.wsgi:application"
+start = "python -m gunicorn --bind 0.0.0.0:8000 --workers 3 SAF_backend.wsgi:application"
 
 [fs]
 # Include all files in the project directory
