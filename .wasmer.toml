@@ -1,0 +1,61 @@
+[package]
+name = "saf-backend"
+version = "0.1.0"
+description = "SAF Backend API"
+
+[dependencies]
+
+[command]
+start = "gunicorn --bind 0.0.0.0:8000 SAF_backend.wsgi:application"
+
+[fs]
+# Include all files in the project directory
+"**"
+
+# Exclude unnecessary files
+"!**/__pycache__"
+"!**/*.pyc"
+"!**/*.pyo"
+"!**/*.pyd"
+"!.git"
+"!.gitignore"
+"!venv"
+"!env"
+"!.env"
+"!.vscode"
+"!.idea"
+"!*.sqlite3"
+"!db.sqlite3"
+
+[build]
+command = "pip install -r requirements.txt && python manage.py collectstatic --noinput"
+
+[build.environment]
+PYTHONUNBUFFERED = "1"
+PYTHONDONTWRITEBYTECODE = "1"
+
+[environment]
+DEBUG = "0"
+ALLOWED_HOSTS = "*"
+
+[healthcheck]
+http = "/health/"
+timeout = 30
+interval = 60
+retries = 3
+
+[scale]
+initial = 1
+max = 3
+min = 1
+
+[[services]]
+http = "/"
+internal_port = 8000
+public = true
+
+[[services.variables]]
+DATABASE_URL = { required = true, description = "PostgreSQL database URL" }
+SECRET_KEY = { required = true, description = "Django secret key" }
+DEBUG = { default = "0", description = "Enable debug mode (0 or 1)" }
+ALLOWED_HOSTS = { default = "*", description = "Comma-separated list of allowed hosts" }

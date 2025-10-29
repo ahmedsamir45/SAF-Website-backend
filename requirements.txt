@@ -1,53 +1,49 @@
-amqp==5.3.1
-asgiref==3.8.1
-attrs==25.4.0
-billiard==4.2.2
-celery==5.5.3
-certifi==2025.1.31
-cffi==1.17.1
-charset-normalizer==3.4.1
-click==8.3.0
-click-didyoumean==0.3.1
-click-plugins==1.1.1.2
-click-repl==0.3.0
-colorama==0.4.6
-cron_descriptor==2.0.6
-cryptography==44.0.2
-defusedxml==0.7.1
+# Core
 Django==5.1.7
-django-celery-beat==2.8.1
-django-cors-headers==4.7.0
-django-filter==25.1
-django-phonenumber-field==8.1.0
-django-timezone-field==7.1
-django_celery_results==2.6.0
 djangorestframework==3.15.2
-djangorestframework_simplejwt==5.5.0
-djoser==2.3.1
-drf-nested-routers==0.94.1
-drf-spectacular==0.28.0
-drf-yasg==1.21.7
-idna==3.10
-inflection==0.5.1
-jsonschema==4.25.1
-jsonschema-specifications==2025.9.1
-kombu==5.5.4
-oauthlib==3.2.2
-packaging==25.0
-phonenumbers==9.0.4
-pillow==11.2.1
-prompt_toolkit==3.0.52
-psycopg2-binary==2.9.10
-pycparser==2.22
-PyJWT==2.9.0
-python-crontab==3.3.0
-python-dateutil==2.9.0.post0
 python-dotenv==1.1.0
-python3-openid==3.2.0
-pytz==2025.2
-PyYAML==6.0.3
-referencing==0.37.0
-requests==2.32.3
+
+# Database
+psycopg2-binary==2.9.10
+dj-database-url==2.1.0
+
+# Authentication & Authorization
+djangorestframework-simplejwt==5.5.0
+djoser==2.3.1
+python-jose[cryptography]==3.3.0
+
+# API Documentation
+drf-yasg==1.21.7
+drf-spectacular==0.28.0
+
+# CORS
+django-cors-headers==4.7.0
+
+# Phone Number Field
+django-phonenumber-field==8.1.0
+phonenumbers==9.0.4
+
+# Filtering
+django-filter==25.1
+
+# Static Files
+whitenoise==6.7.0
+
+# Gunicorn
+gunicorn==22.0.0
+
+# Email
+sendgrid==6.11.0
+
+# Security
+python-dotenv==1.1.0
+cryptography==44.0.2
+
+# ASGI
+uvicorn==0.29.0
+
+# Production Monitoring
+sentry-sdk==2.10.0
 requests-oauthlib==2.0.0
 rpds-py==0.28.0
 six==1.17.0
