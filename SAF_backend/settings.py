@@ -36,7 +36,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-unsafe')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = False
 
 # Base URL for generating absolute URLs
 # In production, this should be set to your domain (e.g., https://yourdomain.com)
@@ -44,7 +44,7 @@ DEFAULT_URL = 'http://127.0.0.1:8000' if DEBUG else 'https://yourdomain.com'
 BASE_URL = os.getenv('BASE_URL', DEFAULT_URL)
 
 # Parse ALLOWED_HOSTS from environment variable or default to all
-ALLOWED_HOSTS = ['*', '.koyeb.app']
+ALLOWED_HOSTS = ['*']
 # -------------------------------------------------------------------
 # CORS SETTINGS
 # -------------------------------------------------------------------
@@ -125,6 +125,8 @@ INSTALLED_APPS = [
 # -------------------------------------------------------------------
 # MIDDLEWARE
 # -------------------------------------------------------------------
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
