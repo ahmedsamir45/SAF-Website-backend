@@ -6,7 +6,13 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
-import dj_database_url
+
+# Try to import dj_database_url, but don't fail if it's not installed
+try:
+    import dj_database_url
+    DATABASE_URL_AVAILABLE = True
+except ImportError:
+    DATABASE_URL_AVAILABLE = False
 
 # Load environment variables from .env file
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
@@ -140,27 +146,36 @@ WSGI_APPLICATION = 'SAF_backend.wsgi.application'
 # Default SQLite configuration for development
 DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(BASE_DIR, "db.sqlite3")}')
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default=DATABASE_URL,
-        conn_max_age=600,
-        conn_health_checks=True,
-        ssl_require=os.getenv('DB_SSL', '').lower() == 'true'
-    )
-}
+if DATABASE_URL_AVAILABLE:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=os.getenv('DB_SSL', '').lower() == 'true'
+        )
+    }
+    
+    # Configure database pool if using PostgreSQL
+    if 'postgresql' in DATABASE_URL:
+        DATABASES['default']['OPTIONS'] = {
+            'connect_timeout': 5,  # 5 seconds connection timeout
+            'keepalives': 1,  # Enable keepalive
+            'keepalives_idle': 30,  # How long connection can be idle
+            'keepalives_interval': 10,  # How often to send keepalive packets
+            'keepalives_count': 5,  # How many keepalive packets to send before dropping
+        }
+else:
+    # Fallback to basic SQLite configuration if dj_database_url is not available
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }
 
 # Enable persistent connections
 DATABASES['default']['CONN_MAX_AGE'] = 60  # 60 seconds connection lifetime
-
-# Configure database pool if using PostgreSQL
-if 'postgresql' in DATABASE_URL:
-    DATABASES['default']['OPTIONS'] = {
-        'connect_timeout': 5,  # 5 seconds connection timeout
-        'keepalives': 1,  # Enable keepalive
-        'keepalives_idle': 30,  # How long connection can be idle
-        'keepalives_interval': 10,  # How often to send keepalive packets
-        'keepalives_count': 5,  # How many keepalive packets to send before dropping
-    }
 
 # -------------------------------------------------------------------
 # CUSTOM USER MODEL
