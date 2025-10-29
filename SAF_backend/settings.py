@@ -7,8 +7,16 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from .env file
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(dotenv_path=env_path)
+
+# Print debug info
+print(f"Loaded .env file from: {env_path}")
+print(f"EMAIL_HOST: {os.getenv('EMAIL_HOST')}")
+print(f"EMAIL_PORT: {os.getenv('EMAIL_PORT')}")
+print(f"EMAIL_HOST_USER: {os.getenv('EMAIL_HOST_USER')}")
+print(f"DEFAULT_FROM_EMAIL: {os.getenv('DEFAULT_FROM_EMAIL')}")
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,7 +25,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-unsafe')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
+
+# Base URL for generating absolute URLs
+# In production, this should be set to your domain (e.g., https://yourdomain.com)
+DEFAULT_URL = 'http://127.0.0.1:8000' if DEBUG else 'https://yourdomain.com'
+BASE_URL = os.getenv('BASE_URL', DEFAULT_URL)
 
 ALLOWED_HOSTS = ['*']  # For development; specify actual hosts in production
 
@@ -59,7 +72,7 @@ INSTALLED_APPS = [
     'djoser',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
-    'drf_yasg',
+    'drf_spectacular',  # For API documentation
     'django_filters',
 
     # Local apps
@@ -112,13 +125,23 @@ AUTHENTICATION_BACKENDS = [
 # REST FRAMEWORK
 # -------------------------------------------------------------------
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
+    'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Change to IsAuthenticated in production
     ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day',
+        'subscription': '5/hour',  # For newsletter subscription
+        'confirm_subscription': '10/hour',  # For confirmation attempts
+    },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
@@ -126,7 +149,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # -------------------------------------------------------------------
@@ -177,20 +200,28 @@ DJOSER = {
 }
 
 # -------------------------------------------------------------------
-# SWAGGER / API DOCS
+# SPECTACULAR SETTINGS (API Documentation)
 # -------------------------------------------------------------------
-SWAGGER_SETTINGS = {
-    'SECURITY_DEFINITIONS': {
-        'Bearer': {
-            'type': 'apiKey',
-            'name': 'Authorization',
-            'in': 'header'
-        }
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'SAF Backend API',
+    'DESCRIPTION': 'API documentation for SAF Backend',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+    'SERVE_PUBLIC': True,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayRequestDuration': True,
     },
-    'USE_SESSION_AUTH': True,
-    'JSON_EDITOR': True,
-    'REFETCH_SCHEMA_WITH_AUTH': True,
-    'REFETCH_SCHEMA_ON_LOGOUT': True,
+    'SECURITY': [
+        {
+            'Bearer': []
+        }
+    ],
+    'TAGS_SORTER': 'alpha',
+    'DEFAULT_GENERATOR_CLASS': 'drf_spectacular.generators.SchemaGenerator',
 }
 
 LOGIN_URL = 'rest_framework:login'
@@ -218,20 +249,54 @@ USE_TZ = True
 # STATIC & MEDIA FILES
 # -------------------------------------------------------------------
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+
+# Media files (uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Ensure the media directory exists
+os.makedirs(MEDIA_ROOT, exist_ok=True)
+
+# File upload permissions
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 
 # -------------------------------------------------------------------
 # EMAIL CONFIGURATION
 # -------------------------------------------------------------------
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@yourdomain.com')
-ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@example.com')  # Add this line
+# Email Configuration
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Debug email settings
+print("\nEmail Configuration:")
+print(f"EMAIL_BACKEND: {EMAIL_BACKEND}")
+print(f"EMAIL_HOST: {EMAIL_HOST}")
+print(f"EMAIL_PORT: {EMAIL_PORT}")
+print(f"EMAIL_USE_TLS: {EMAIL_USE_TLS}")
+print(f"EMAIL_HOST_USER: {EMAIL_HOST_USER}")
+print(f"DEFAULT_FROM_EMAIL: {DEFAULT_FROM_EMAIL}")
+
+# Admin email (for error reporting)
+ADMINS = [
+    ('Admin', os.getenv('ADMIN_EMAIL', 'admin@yourdomain.com')),
+]
+
+# For testing purposes, you can use console backend in development
+# To test real email sending, set SEND_REAL_EMAILS=True in your .env file
+if DEBUG and not os.getenv('SEND_REAL_EMAILS', '').lower() == 'true':
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    print("Using console email backend. To enable real email sending, set SEND_REAL_EMAILS=True in .env")
+
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@example.com')
 
 # -------------------------------------------------------------------
 # DEFAULTS
@@ -241,10 +306,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # -------------------------------------------------------------------
 # TEMPLATES
 # -------------------------------------------------------------------
+import os
+from pathlib import Path
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],  # optional templates folder
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

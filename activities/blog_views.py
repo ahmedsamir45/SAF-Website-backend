@@ -2,16 +2,22 @@
 Views for blog and newsletter functionality.
 """
 import uuid
-from rest_framework import viewsets, status, permissions, mixins
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from django.contrib.auth import get_user_model
+import logging
+from rest_framework import viewsets, mixins, permissions, status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAdminUser
+from rest_framework.views import APIView
+from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.core.mail import send_mail
+from django.core.mail import send_mail, send_mass_mail
 from django.conf import settings
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from .models import Category, BlogPost, NewsletterSubscription
 from .blog_serializers import (
@@ -110,6 +116,8 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         return Response({'view_count': blog_post.view_count})
 
 
+from .throttles import NewsletterSubscriptionThrottle, NewsletterConfirmThrottle
+
 class NewsletterSubscriptionViewSet(
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
@@ -124,6 +132,13 @@ class NewsletterSubscriptionViewSet(
     serializer_class = NewsletterSubscriptionSerializer
     permission_classes = [permissions.AllowAny]  # Allow unauthenticated subscriptions
     lookup_field = 'email'
+    throttle_classes = [NewsletterSubscriptionThrottle]
+    
+    # Override get_throttles to use different throttle for confirm action
+    def get_throttles(self):
+        if self.action == 'confirm':
+            return [NewsletterConfirmThrottle()]
+        return super().get_throttles()
     
     def get_queryset(self):
         if self.request.user.is_staff:
@@ -320,11 +335,14 @@ class NewsletterSubscriptionViewSet(
         return ip
     
     def send_confirmation_email(self, subscription):
-        """Send a confirmation email to the subscriber."""
+        """Send a confirmation email to the subscriber with HTML template."""
+        from django.template.loader import render_to_string
+        from django.core.mail import EmailMultiAlternatives
+        
         subject = 'Confirm your newsletter subscription'
         
         # Get frontend URL from settings or use a default
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        frontend_url = getattr(settings, 'FRONTEND_URL', settings.BASE_URL)
         
         # Create confirmation URL
         confirmation_url = (
@@ -332,17 +350,40 @@ class NewsletterSubscriptionViewSet(
             f"?email={subscription.email}&code={subscription.confirmation_code}"
         )
         
-        message = (
-            f"Thank you for subscribing to our newsletter!\n\n"
-            f"Please confirm your subscription by clicking the following link:\n"
-            f"{confirmation_url}\n\n"
-            f"If you didn't subscribe, please ignore this email."
+        # Prepare context for the email template
+        context = {
+            'confirmation_url': confirmation_url,
+            'site_url': frontend_url,
+            'email': subscription.email
+        }
+        
+        # Render both HTML and plain text versions
+        html_content = render_to_string('emails/newsletter_confirm.html', context)
+        text_content = (
+            "Thank you for subscribing to our newsletter!\n\n"
+            f"Please confirm your email by visiting this link:\n{confirmation_url}\n\n"
+            "If you didn't request this, please ignore this email.\n"
         )
         
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[subscription.email],
-            fail_silently=False,
-        )
+        try:
+            # Create the email
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[subscription.email],
+                reply_to=[getattr(settings, 'REPLY_TO_EMAIL', settings.DEFAULT_FROM_EMAIL)]
+            )
+            
+            # Attach the HTML version
+            msg.attach_alternative(html_content, "text/html")
+            
+            # Send the email
+            msg.send(fail_silently=False)
+            
+            # Log the successful email sending
+            logger.info(f"Confirmation email sent to {subscription.email}")
+            
+        except Exception as e:
+            logger.error(f"Failed to send confirmation email to {subscription.email}: {str(e)}")
+            raise

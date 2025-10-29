@@ -88,6 +88,9 @@ urlpatterns += [
     path('newsletter/confirm/', 
          NewsletterSubscriptionViewSet.as_view({'post': 'confirm'}), 
          name='newsletter-confirm'),
+    path('newsletter-subscriptions/<str:email>/status/', 
+         NewsletterSubscriptionViewSet.as_view({'get': 'status'}), 
+         name='newsletter-status'),
     
     # Program actions
     path('programs/featured/', 

@@ -456,6 +456,25 @@ class WeeklyEmail(BaseModel):
     sent_date = models.DateField(default=now)
     users = models.ManyToManyField(User, related_name='weekly_emails')
     programs = models.ManyToManyField(Program, related_name='weekly_emails')
+    email_sent = models.BooleanField(default=False)
+    sent_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.subject
+        
+    def send_emails(self):
+        """
+        Send this weekly email to all subscribers.
+        Returns the number of emails sent.
+        """
+        from .emails import send_weekly_newsletter
+        
+        try:
+            send_weekly_newsletter()
+            self.email_sent = True
+            self.sent_at = timezone.now()
+            self.save()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send weekly email {self.id}: {str(e)}")
+            return False
