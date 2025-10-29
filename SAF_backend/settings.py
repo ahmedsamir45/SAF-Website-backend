@@ -44,8 +44,7 @@ DEFAULT_URL = 'http://127.0.0.1:8000' if DEBUG else 'https://yourdomain.com'
 BASE_URL = os.getenv('BASE_URL', DEFAULT_URL)
 
 # Parse ALLOWED_HOSTS from environment variable or default to all
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
-
+ALLOWED_HOSTS = ['127.0.0.1', '.wasmer.app']
 # -------------------------------------------------------------------
 # CORS SETTINGS
 # -------------------------------------------------------------------
