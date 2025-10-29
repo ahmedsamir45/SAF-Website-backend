@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+import dj_database_url
 
 # Load environment variables from .env file
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
@@ -122,12 +123,30 @@ WSGI_APPLICATION = 'SAF_backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
+# Default SQLite configuration for development
+DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(BASE_DIR, "db.sqlite3")}')
+
 DATABASES = {
     'default': dj_database_url.config(
-        default='sqlite:///' + os.path.join(BASE_DIR, 'db.sqlite3'),
-        conn_max_age=600
+        default=DATABASE_URL,
+        conn_max_age=600,
+        conn_health_checks=True,
+        ssl_require=os.getenv('DB_SSL', '').lower() == 'true'
     )
 }
+
+# Enable persistent connections
+DATABASES['default']['CONN_MAX_AGE'] = 60  # 60 seconds connection lifetime
+
+# Configure database pool if using PostgreSQL
+if 'postgresql' in DATABASE_URL:
+    DATABASES['default']['OPTIONS'] = {
+        'connect_timeout': 5,  # 5 seconds connection timeout
+        'keepalives': 1,  # Enable keepalive
+        'keepalives_idle': 30,  # How long connection can be idle
+        'keepalives_interval': 10,  # How often to send keepalive packets
+        'keepalives_count': 5,  # How many keepalive packets to send before dropping
+    }
 
 # -------------------------------------------------------------------
 # CUSTOM USER MODEL
