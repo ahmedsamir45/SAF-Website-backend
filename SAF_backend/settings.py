@@ -5,7 +5,11 @@ Django settings for SAF_backend project.
 from pathlib import Path
 import os
 from datetime import timedelta
+import os
 from dotenv import load_dotenv
+
+# Port configuration
+PORT = os.environ.get('PORT', '12083')  # Default to 12083 if not set
 
 # Try to import dj_database_url, but don't fail if it's not installed
 try:
