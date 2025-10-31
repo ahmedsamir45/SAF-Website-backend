@@ -2,16 +2,30 @@
 Views for blog and newsletter functionality.
 """
 import uuid
-from rest_framework import viewsets, status, permissions, mixins
-from rest_framework.views import APIView
+import logging
+from datetime import timedelta
+from rest_framework import (
+    viewsets, mixins, permissions, status, exceptions
+)
+from rest_framework.decorators import action, permission_classes
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAdminUser, AllowAny
+from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.core.mail import send_mail
+from django.core.mail import send_mail, send_mass_mail
 from django.conf import settings
+from django.urls import reverse
+from django.db import transaction
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Constants
+ACTIVATION_EXPIRY_HOURS = 24  # Activation link expiry time in hours
 
 from .models import Category, BlogPost, NewsletterSubscription
 from .blog_serializers import (
@@ -110,6 +124,9 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         return Response({'view_count': blog_post.view_count})
 
 
+from .throttles import NewsletterSubscriptionThrottle
+
+@permission_classes([AllowAny])
 class NewsletterSubscriptionViewSet(
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,
@@ -118,231 +135,321 @@ class NewsletterSubscriptionViewSet(
     viewsets.GenericViewSet
 ):
     """
-    ViewSet for managing newsletter subscriptions.
-    Allows unauthenticated users to subscribe to the newsletter.
+    ViewSet for managing newsletter subscriptions with email verification.
+    - Allows unauthenticated users to subscribe with email verification
+    - Implements rate limiting to prevent abuse
+    - Handles subscription activation via unique links
     """
     serializer_class = NewsletterSubscriptionSerializer
-    permission_classes = [permissions.AllowAny]  # Allow unauthenticated subscriptions
     lookup_field = 'email'
-    
+    throttle_classes = [NewsletterSubscriptionThrottle]
+
     def get_queryset(self):
+        # Only allow users to see their own subscription or all for admins
         if self.request.user.is_staff:
             return NewsletterSubscription.objects.all()
-        # For non-staff users, only allow access to their own subscription
-        if self.request.user.is_authenticated:
-            return NewsletterSubscription.objects.filter(email=self.request.user.email)
-        return NewsletterSubscription.objects.none()
-    
+        return NewsletterSubscription.objects.none()  # Regular users can't list subscriptions
+
     def get_serializer_context(self):
         """
         Extra context provided to the serializer class.
         """
         context = super().get_serializer_context()
-        context['request'] = self.request
+        context.update({
+            'request': self.request,
+            'ip_address': self.get_client_ip(),
+            'user_agent': self.request.META.get('HTTP_USER_AGENT', '')
+        })
         return context
-    
+
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
-        """Handle newsletter subscription."""
+        """
+        Handle newsletter subscription with email verification.
+        - Validates email format
+        - Prevents duplicate subscriptions
+        - Sends verification email with unique activation link
+        - Implements atomic transaction for data consistency
+        """
         email = request.data.get('email', '').strip().lower()
         
         # Validate email
-        if not email:
+        if not email or '@' not in email:
             return Response(
                 {
                     'status': 'error',
-                    'message': 'Email is required.',
-                    'field_errors': {'email': ['This field is required.']}
+                    'message': 'A valid email address is required.',
+                    'errors': {'email': ['This field must be a valid email address.']}
                 },
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        with transaction.atomic():
+            # Check for existing subscription
+            subscription, created = NewsletterSubscription.objects.get_or_create(
+                email=email,
+                defaults={
+                    'activation_code': str(uuid.uuid4()),
+                    'activation_sent_at': timezone.now(),
+                    'is_active': False,
+                    'ip_address': self.get_client_ip(),
+                }
             )
             
-        # Simple email validation
-        from django.core.validators import validate_email
-        from django.core.exceptions import ValidationError
-        
-        try:
-            validate_email(email)
-        except ValidationError:
-            return Response(
-                {
-                    'status': 'error',
-                    'message': 'Please enter a valid email address.',
-                    'field_errors': {'email': ['Enter a valid email address.']}
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Check if already subscribed and active
-        try:
-            subscription = NewsletterSubscription.objects.get(email=email)
-            if subscription.is_active:
+            # If subscription exists and is active
+            if not created and subscription.is_active:
                 return Response(
                     {
                         'status': 'success',
-                        'message': 'You are already subscribed to our newsletter.',
-                        'data': {'email': email, 'is_active': True}
+                        'message': 'You are already subscribed to our newsletter!',
+                        'data': {
+                            'email': email,
+                            'is_active': True,
+                            'already_subscribed': True
+                        }
                     },
                     status=status.HTTP_200_OK
                 )
             
-            # If exists but not active, update the subscription
-            subscription.confirmation_code = uuid.uuid4()
-            subscription.ip_address = self.get_client_ip()
-            subscription.save(update_fields=['confirmation_code', 'ip_address'])
+            # Update activation code for existing inactive subscription
+            if not created:
+                subscription.activation_code = str(uuid.uuid4())
+                subscription.activation_sent_at = timezone.now()
+                subscription.save(update_fields=['activation_code', 'activation_sent_at'])
             
-        except NewsletterSubscription.DoesNotExist:
-            # Create new subscription
-            subscription = NewsletterSubscription.objects.create(
-                email=email,
-                ip_address=self.get_client_ip(),
-                is_active=False,
-                confirmation_code=uuid.uuid4()
-            )
-        
-        # Send confirmation email
-        try:
-            self.send_confirmation_email(subscription)
-            return Response(
-                {
-                    'status': 'success',
-                    'message': 'Confirmation email has been sent. Please check your inbox to confirm your subscription.',
-                    'data': {'email': email, 'confirmation_sent': True}
-                },
-                status=status.HTTP_201_CREATED
-            )
+            # Build activation URL
+            activation_path = reverse('newsletter-activate', kwargs={
+                'email': subscription.email,
+                'activation_code': str(subscription.activation_code)
+            })
+            activation_url = request.build_absolute_uri(activation_path)
             
-        except Exception as e:
-            # Log the error but don't fail the subscription
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to send confirmation email to {email}: {str(e)}")
-            
-            # Still return success since we've saved the subscription
-            return Response(
-                {
-                    'status': 'success',
-                    'message': 'Subscription received, but we encountered an issue sending the confirmation email. You can request a new confirmation email later.',
-                    'data': {
-                        'email': email,
-                        'confirmation_sent': False,
-                        'needs_confirmation': True
-                    }
-                },
-                status=status.HTTP_201_CREATED
-            )
-    
-    @action(detail=False, methods=['post'])
-    def confirm(self, request):
-        """
-        Confirm a newsletter subscription.
-        Requires 'email' and 'confirmation_code' in the request data.
-        """
-        serializer = NewsletterConfirmSerializer(data=request.data)
-        
-        if not serializer.is_valid():
-            return Response(
-                {
-                    'status': 'error',
-                    'message': 'Invalid confirmation data.',
-                    'errors': serializer.errors
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        subscription = serializer.validated_data['subscription']
-        
-        # Check if already confirmed
-        if subscription.is_active:
-            return Response(
-                {
-                    'status': 'success',
-                    'message': 'This subscription is already active.',
-                    'data': {
-                        'email': subscription.email,
-                        'is_active': True,
-                        'already_confirmed': True
-                    }
-                },
-                status=status.HTTP_200_OK
-            )
-        
-        # Confirm the subscription
-        subscription.confirm()
-        
-        return Response(
-            {
-                'status': 'success',
-                'message': 'Thank you for confirming your subscription!',
-                'data': {
-                    'email': subscription.email,
-                    'is_active': True,
-                    'confirmed_at': subscription.confirmed_at
-                }
-            },
-            status=status.HTTP_200_OK
-        )
+            # Send activation email
+            try:
+                send_mail(
+                    subject='Activate Your Newsletter Subscription',
+                    message=f'''
+                    Thank you for subscribing to our newsletter!
+                    
+                    Please click the following link to confirm your subscription:
+                    {activation_url}
+                    
+                    This link will expire in {ACTIVATION_EXPIRY_HOURS} hours.
+                    
+                    If you did not request this, please ignore this email.
+                    ''',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+                
+                logger.info(f"Activation email sent to {email}")
+                
+                return Response(
+                    {
+                        'status': 'success',
+                        'message': 'Please check your email to activate your subscription.',
+                        'data': {
+                            'email': email,
+                            'is_active': False,
+                            'activation_sent': True
+                        }
+                    },
+                    status=status.HTTP_201_CREATED
+                )
+                
+            except Exception as e:
+                logger.error(f"Failed to send activation email to {email}: {str(e)}")
+                if created:  # Only delete if we just created this record
+                    subscription.delete()
+                
+                return Response(
+                    {
+                        'status': 'error',
+                        'message': 'Failed to send activation email. Please try again later.',
+                        'errors': {'email': ['Failed to send activation email.']}
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE
+                )
     
     @action(detail=True, methods=['get'])
+    @permission_classes([AllowAny])
     def status(self, request, email=None):
-        """Check subscription status for an email."""
+        """
+        Check subscription status for an email.
+        - Public endpoint (no authentication required)
+        - Returns minimal information for privacy
+        """
+        if not email or '@' not in email:
+            return Response(
+                {'error': 'Valid email is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
         try:
-            subscription = NewsletterSubscription.objects.get(email=email)
+            subscription = NewsletterSubscription.objects.get(email=email.lower())
             return Response({
                 'email': subscription.email,
                 'is_active': subscription.is_active,
-                'subscribed_at': subscription.created_at,
-                'confirmed_at': subscription.confirmed_at
+                'subscribed_at': subscription.created_at.isoformat() if subscription.created_at else None
             })
         except NewsletterSubscription.DoesNotExist:
             return Response({
                 'email': email,
                 'is_active': False,
-                'message': 'Email is not subscribed.'
+                'message': 'No active subscription found for this email.'
             }, status=status.HTTP_404_NOT_FOUND)
-
+    
     @action(detail=True, methods=['post'])
+    @permission_classes([AllowAny])
     def unsubscribe(self, request, email=None):
-        """Unsubscribe from the newsletter."""
-        subscription = self.get_object()
-        subscription.unsubscribe()
-        return Response(
-            {'detail': 'Successfully unsubscribed from the newsletter.'},
-            status=status.HTTP_200_OK
-        )
+        """
+        Unsubscribe from the newsletter.
+        - Public endpoint (no authentication required)
+        - Implements idempotent unsubscription
+        """
+        if not email or '@' not in email:
+            return Response(
+                {'error': 'Valid email is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            subscription = NewsletterSubscription.objects.get(
+                email=email.lower(),
+                is_active=True  # Only unsubscribe active subscriptions
+            )
+            
+            subscription.unsubscribe()  # Using the model method
+            
+            return Response({
+                'status': 'success',
+                'message': 'You have been unsubscribed from our newsletter.',
+                'data': {
+                    'email': email,
+                    'is_active': False,
+                    'unsubscribed_at': subscription.unsubscribed_at.isoformat()
+                }
+            })
+            
+        except NewsletterSubscription.DoesNotExist:
+            # Return success even if already unsubscribed or never subscribed
+            return Response({
+                'status': 'success',
+                'message': 'No active subscription found for this email.',
+                'email': email,
+                'is_active': False
+            }, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'], 
+             url_path='activate/(?P<email>[^/.]+)/(?P<activation_code>[^/.]+)')
+    @permission_classes([AllowAny])
+    def activate(self, request, email=None, activation_code=None):
+        """
+        Activate a newsletter subscription using the activation code.
+        - Public endpoint (no authentication required)
+        - Handles activation code expiration
+        - Implements one-time use of activation codes
+        """
+        if not all([email, activation_code]) or '@' not in email:
+            return Response(
+                {
+                    'status': 'error',
+                    'message': 'Valid email and activation code are required.'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                # Use select_for_update to prevent race conditions
+                subscription = NewsletterSubscription.objects.select_for_update().get(
+                    email=email.lower(),
+                    activation_code=activation_code,
+                    is_active=False
+                )
+                
+                # Check if activation code is expired
+                expiry_time = subscription.activation_sent_at + timedelta(hours=ACTIVATION_EXPIRY_HOURS)
+                if timezone.now() > expiry_time:
+                    # Delete expired subscription to clean up
+                    subscription.delete()
+                    return Response(
+                        {
+                            'status': 'error',
+                            'message': 'Activation link has expired. Please subscribe again.',
+                            'email': email
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Activate the subscription
+                subscription.is_active = True
+                subscription.activated_at = timezone.now()
+                subscription.activation_code = None  # Invalidate the code after use
+                subscription.save(update_fields=[
+                    'is_active', 
+                    'activated_at', 
+                    'activation_code',
+                    'updated_at'
+                ])
+                
+                logger.info(f"Activated subscription for {email}")
+                
+                # Redirect to success page or return success response
+                return Response(
+                    {
+                        'status': 'success',
+                        'message': 'Your subscription has been activated successfully!',
+                        'data': {
+                            'email': email,
+                            'is_active': True,
+                            'activated_at': subscription.activated_at.isoformat()
+                        }
+                    },
+                    status=status.HTTP_200_OK
+                )
+                
+        except NewsletterSubscription.DoesNotExist:
+            logger.warning(f"Invalid activation attempt for {email}")
+            return Response(
+                {
+                    'status': 'error',
+                    'message': 'Invalid or expired activation link. Please request a new one.',
+                    'email': email
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        except Exception as e:
+            logger.error(f"Error activating subscription for {email}: {str(e)}")
+            return Response(
+                {
+                    'status': 'error',
+                    'message': 'An error occurred while activating your subscription. Please try again.',
+                    'email': email
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     def get_client_ip(self):
-        """Get the client's IP address."""
-        x_forwarded_for = self.request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = self.request.META.get('REMOTE_ADDR')
-        return ip
-    
-    def send_confirmation_email(self, subscription):
-        """Send a confirmation email to the subscriber."""
-        subject = 'Confirm your newsletter subscription'
+        """
+        Get the client's IP address.
+        Handles various proxy headers and returns the most reliable IP.
+        """
+        # Standard headers used by proxies to forward the client IP
+        proxy_headers = [
+            'HTTP_X_FORWARDED_FOR',
+            'HTTP_X_REAL_IP',
+            'HTTP_CLIENT_IP',
+            'REMOTE_ADDR',
+        ]
         
-        # Get frontend URL from settings or use a default
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        for header in proxy_headers:
+            if header in self.request.META:
+                # Get the first IP in case of multiple IPs (common with X-Forwarded-For)
+                ip = self.request.META[header].split(',')[0].strip()
+                if ip:
+                    return ip
         
-        # Create confirmation URL
-        confirmation_url = (
-            f"{frontend_url.rstrip('/')}/newsletter/confirm/"
-            f"?email={subscription.email}&code={subscription.confirmation_code}"
-        )
-        
-        message = (
-            f"Thank you for subscribing to our newsletter!\n\n"
-            f"Please confirm your subscription by clicking the following link:\n"
-            f"{confirmation_url}\n\n"
-            f"If you didn't subscribe, please ignore this email."
-        )
-        
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[subscription.email],
-            fail_silently=False,
-        )
+        return '0.0.0.0'  # Default if no IP found

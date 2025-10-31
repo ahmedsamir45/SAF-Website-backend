@@ -1,0 +1,71 @@
+/* Email Admin Styles */
+
+/* Status indicators */
+.status-pending {
+    color: #f0ad4e;  /* Bootstrap warning color */
+}
+
+.status-sending {
+    color: #5bc0de;  /* Bootstrap info color */
+    font-weight: bold;
+}
+
+.status-sent {
+    color: #5cb85c;  /* Bootstrap success color */
+}
+
+.status-failed {
+    color: #d9534f;  /* Bootstrap danger color */
+    font-weight: bold;
+}
+
+.status-partially_sent {
+    color: #f0ad4e;  /* Bootstrap warning color */
+    font-weight: bold;
+}
+
+/* Send button styles */
+.button-send-now {
+    background-color: #5cb85c;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 3px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.button-send-now:hover {
+    background-color: #4cae4c;
+    color: white;
+}
+
+/* Stats display */
+.stats {
+    margin: 10px 0;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.stats .success {
+    color: #5cb85c;
+    margin-right: 15px;
+}
+
+.stats .failure {
+    color: #d9534f;
+}
+
+/* Error display */
+.error-log {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+    white-space: pre-wrap;
+    font-family: monospace;
+    max-height: 200px;
+    overflow-y: auto;
+}

@@ -5,10 +5,29 @@ Django settings for SAF_backend project.
 from pathlib import Path
 import os
 from datetime import timedelta
+import os
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Port configuration
+PORT = os.environ.get('PORT', '8000')  # Default to 12083 if not set
+
+# Try to import dj_database_url, but don't fail if it's not installed
+try:
+    import dj_database_url
+    DATABASE_URL_AVAILABLE = True
+except ImportError:
+    DATABASE_URL_AVAILABLE = False
+
+# Load environment variables from .env file
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(dotenv_path=env_path)
+
+# Print debug info
+print(f"Loaded .env file from: {env_path}")
+print(f"EMAIL_HOST: {os.getenv('EMAIL_HOST')}")
+print(f"EMAIL_PORT: {os.getenv('EMAIL_PORT')}")
+print(f"EMAIL_HOST_USER: {os.getenv('EMAIL_HOST_USER')}")
+print(f"DEFAULT_FROM_EMAIL: {os.getenv('DEFAULT_FROM_EMAIL')}")
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,14 +36,50 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-unsafe')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['*']  # For development; specify actual hosts in production
+# Base URL for generating absolute URLs
+# In production, this should be set to your domain (e.g., https://yourdomain.com)
+DEFAULT_URL = 'http://127.0.0.1:8000' if DEBUG else 'https://yourdomain.com'
+BASE_URL = os.getenv('BASE_URL', DEFAULT_URL)
 
+# Parse ALLOWED_HOSTS from environment variable or default to all
+ALLOWED_HOSTS = ['*']
 # -------------------------------------------------------------------
 # CORS SETTINGS
 # -------------------------------------------------------------------
-CORS_ALLOW_ALL_ORIGINS = True  # For development only
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
+# Security settings
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True') == 'True'
+SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'
+CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True') == 'True'
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_REFERRER_POLICY = 'same-origin'
+
+DEFAULT_CSRF_ORIGINS = [
+    '*',
+    'http://localhost',
+    'http://127.0.0.1',
+]
+DEFAULT_CORS_ORIGINS = [
+    'https://saf-website-backend-backend-only-f6d2c1c.kuberns.cloud',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.koyeb.app',
+]
+
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', ','.join(DEFAULT_CORS_ORIGINS)).split(',')
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -59,8 +114,9 @@ INSTALLED_APPS = [
     'djoser',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
-    'drf_yasg',
+    'drf_yasg',  # For API documentation
     'django_filters',
+    'whitenoise.runserver_nostatic',
 
     # Local apps
     'activities',
@@ -69,8 +125,11 @@ INSTALLED_APPS = [
 # -------------------------------------------------------------------
 # MIDDLEWARE
 # -------------------------------------------------------------------
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # Keep this near the top
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -88,13 +147,42 @@ WSGI_APPLICATION = 'SAF_backend.wsgi.application'
 
 # -------------------------------------------------------------------
 # DATABASE (SQLite)
-# -------------------------------------------------------------------
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+# Database
+# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
+
+# Default SQLite configuration for development
+DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(BASE_DIR, "db.sqlite3")}')
+
+if DATABASE_URL_AVAILABLE:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=os.getenv('DB_SSL', '').lower() == 'true'
+        )
     }
-}
+    
+    # Configure database pool if using PostgreSQL
+    if 'postgresql' in DATABASE_URL:
+        DATABASES['default']['OPTIONS'] = {
+            'connect_timeout': 5,  # 5 seconds connection timeout
+            'keepalives': 1,  # Enable keepalive
+            'keepalives_idle': 30,  # How long connection can be idle
+            'keepalives_interval': 10,  # How often to send keepalive packets
+            'keepalives_count': 5,  # How many keepalive packets to send before dropping
+        }
+else:
+    # Fallback to basic SQLite configuration if dj_database_url is not available
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }
+
+# Enable persistent connections
+DATABASES['default']['CONN_MAX_AGE'] = 60  # 60 seconds connection lifetime
 
 # -------------------------------------------------------------------
 # CUSTOM USER MODEL
@@ -112,13 +200,23 @@ AUTHENTICATION_BACKENDS = [
 # REST FRAMEWORK
 # -------------------------------------------------------------------
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
+    'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Change to IsAuthenticated in production
     ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day',
+        'subscription': '5/hour',  # For newsletter subscription
+        'confirm_subscription': '10/hour',  # For confirmation attempts
+    },
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
@@ -126,7 +224,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
-    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema',
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # -------------------------------------------------------------------
@@ -145,7 +243,7 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
     'AUTH_COOKIE': 'access',
-    'AUTH_COOKIE_SECURE': False,
+    'AUTH_COOKIE_SECURE': os.getenv('COOKIE_SECURE', 'False') == 'True',
     'AUTH_COOKIE_HTTP_ONLY': True,
     'AUTH_COOKIE_PATH': '/',
     'AUTH_COOKIE_SAMESITE': 'Lax',
@@ -177,20 +275,28 @@ DJOSER = {
 }
 
 # -------------------------------------------------------------------
-# SWAGGER / API DOCS
+# SPECTACULAR SETTINGS (API Documentation)
 # -------------------------------------------------------------------
-SWAGGER_SETTINGS = {
-    'SECURITY_DEFINITIONS': {
-        'Bearer': {
-            'type': 'apiKey',
-            'name': 'Authorization',
-            'in': 'header'
-        }
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'SAF Backend API',
+    'DESCRIPTION': 'API documentation for SAF Backend',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+    'SERVE_PUBLIC': True,
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayRequestDuration': True,
     },
-    'USE_SESSION_AUTH': True,
-    'JSON_EDITOR': True,
-    'REFETCH_SCHEMA_WITH_AUTH': True,
-    'REFETCH_SCHEMA_ON_LOGOUT': True,
+    'SECURITY': [
+        {
+            'Bearer': []
+        }
+    ],
+    'TAGS_SORTER': 'alpha',
+    'DEFAULT_GENERATOR_CLASS': 'drf_spectacular.generators.SchemaGenerator',
 }
 
 LOGIN_URL = 'rest_framework:login'
@@ -215,15 +321,32 @@ USE_I18N = True
 USE_TZ = True
 
 # -------------------------------------------------------------------
-# STATIC & MEDIA FILES
-# -------------------------------------------------------------------
-STATIC_URL = '/static/'
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/5.0/howto/static-files/
+
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+
+# Create static directory if it doesn't exist
+os.makedirs(os.path.join(BASE_DIR, 'static'), exist_ok=True)
+
+# Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Create media directory if it doesn't exist
+# Ensure the media directory exists
+os.makedirs(MEDIA_ROOT, exist_ok=True)
+
+# File upload permissions
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 
 # -------------------------------------------------------------------
 # EMAIL CONFIGURATION
 # -------------------------------------------------------------------
+# Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
@@ -241,10 +364,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # -------------------------------------------------------------------
 # TEMPLATES
 # -------------------------------------------------------------------
+import os
+from pathlib import Path
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],  # optional templates folder
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

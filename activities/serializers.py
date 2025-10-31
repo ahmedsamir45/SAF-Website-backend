@@ -1,7 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from .models import Program, ProgramImage, Favorite, ContactMessage
+from .models import Program, ProgramImage, Favorite, ContactMessage, Requirement
+from rest_framework.serializers import SerializerMethodField
+from django.conf import settings
 
 User = get_user_model()
 
@@ -38,11 +40,45 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
+class RequirementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Requirement
+        fields = ['id', 'description']
+        read_only_fields = ('id',)
+
 class ProgramSerializer(serializers.ModelSerializer):
+    requirements = RequirementSerializer(many=True, read_only=True)
+    image_url = serializers.SerializerMethodField()
+    
     class Meta:
         model = Program
-        fields = '__all__'
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        fields = [
+            'id', 'title', 'description', 'cost', 'start_date', 'end_date', 
+            'post_date', 'url', 'type', 'category', 'audience', 'kind', 
+            'target_academic', 'image', 'image_url', 'is_featured', 'created_at', 
+            'updated_at', 'requirements'
+        ]
+        read_only_fields = ('id', 'created_at', 'updated_at', 'image_url')
+    
+    def get_image_url(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request is not None:
+                # In development, use request.build_absolute_uri
+                if settings.DEBUG:
+                    return request.build_absolute_uri(obj.image.url)
+                # In production, use the full URL with the domain
+                return f"{settings.BASE_URL}{obj.image.url}"
+            # Fallback if no request is available
+            return f"{settings.BASE_URL}{obj.image.url}"
+        return None
+    
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # Ensure requirements are included in the response
+        if 'requirements' not in representation or representation['requirements'] is None:
+            representation['requirements'] = []
+        return representation
 
 
 class ProgramImageSerializer(serializers.ModelSerializer):

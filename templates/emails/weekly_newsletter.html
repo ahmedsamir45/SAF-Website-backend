@@ -1,0 +1,35 @@
+{% extends "emails/base.html" %}
+
+{% block content %}
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h1 style="color: #2c3e50;">Weekly Programs Update</h1>
+        <p>Here are the latest programs we've selected for you this week!</p>
+    </div>
+
+    <div style="background-color: #f9f9f9; border-radius: 5px; padding: 20px; margin-bottom: 20px;">
+        <h2 style="color: #2c3e50; margin-top: 0;">Featured Programs</h2>
+        
+        {% for program in programs %}
+        <div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee;">
+            <h3 style="margin-bottom: 5px; color: #3498db;">{{ program.title }}</h3>
+            {% if program.image %}
+            <div style="margin: 10px 0;">
+                <img src="{{ program.image_url }}" alt="{{ program.title }}" style="max-width: 100%; height: auto; border-radius: 4px;">
+            </div>
+            {% endif %}
+            <p style="margin: 10px 0; color: #555;">{{ program.description|truncatewords:30 }}</p>
+            <a href="{{ program.url }}" style="display: inline-block; background-color: #3498db; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; margin-top: 10px;">Learn More</a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div style="text-align: center; margin-top: 30px; color: #7f8c8d; font-size: 14px;">
+        <p>You're receiving this email because you subscribed to our weekly newsletter.</p>
+        <p>
+            <a href="{{ unsubscribe_url }}" style="color: #7f8c8d; text-decoration: underline;">Unsubscribe</a> | 
+            <a href="{{ site_url }}" style="color: #7f8c8d; text-decoration: underline;">Visit our website</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -8,8 +8,6 @@ from rest_framework_simplejwt.views import (
     TokenBlacklistView,
 )
 from rest_framework import permissions
-from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
 
 from .views import (
     ProgramViewSet, ProgramImageViewSet, FavoriteViewSet, UserViewSet, 
@@ -31,31 +29,56 @@ router.register(r'users', UserViewSet, basename='user')
 router.register(r'programs', ProgramViewSet, basename='program')
 router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'blog-posts', BlogPostViewSet, basename='blogpost')
-router.register(r'newsletter-subscriptions', NewsletterSubscriptionViewSet, 
-               basename='newslettersubscription')
 router.register(r'messages', MessageContactViewSet, basename='message')
+
+# Newsletter subscription endpoints
+newsletter_router = DefaultRouter()
+newsletter_router.register(r'subscriptions', NewsletterSubscriptionViewSet, 
+                         basename='newslettersubscription')
 
 # Nested routers for programs and users
 programs_router = routers.NestedSimpleRouter(router, r'programs', lookup='program')
 programs_router.register(r'images', ProgramImageViewSet, basename='program-image')
 
-# Add favorite endpoints directly to urlpatterns
+users_router = routers.NestedSimpleRouter(router, r'users', lookup='user')
+users_router.register(r'favorites', FavoriteViewSet, basename='user-favorite')
+
+# Program favorite endpoints
 program_favorite_urls = [
     path('<int:pk>/favorite/', ProgramViewSet.as_view({'post': 'favorite'}), name='program-favorite'),
     path('<int:pk>/is_favorite/', ProgramViewSet.as_view({'get': 'is_favorite'}), name='program-is-favorite'),
     path('favorites/ids/', ProgramViewSet.as_view({'get': 'favorites_ids'}), name='program-favorites-ids'),
 ]
 
+# Newsletter subscription endpoints
+newsletter_subscription_urls = [
+    path('', NewsletterSubscriptionViewSet.as_view({'get': 'list', 'post': 'create'}), name='newsletter-list'),
+    path('<str:email>/', NewsletterSubscriptionViewSet.as_view({
+        'get': 'retrieve',
+        'delete': 'destroy',
+        'put': 'update',
+        'patch': 'partial_update'
+    }), name='newsletter-detail'),
+    path('<str:email>/status/', NewsletterSubscriptionViewSet.as_view({'get': 'status'}), name='newsletter-status'),
+    path('<str:email>/unsubscribe/', NewsletterSubscriptionViewSet.as_view({'post': 'unsubscribe'}), name='newsletter-unsubscribe'),
+    path('activate/<str:email>/', NewsletterSubscriptionViewSet.as_view({'post': 'activate'}), name='newsletter-activate'),
+]
 
-users_router = routers.NestedSimpleRouter(router, r'users', lookup='user')
-users_router.register(r'favorites', FavoriteViewSet, basename='user-favorite')
-
+# Main URL patterns
 urlpatterns = [
     # Public program categories view
     path('public/programs/categories/', ProgramCategoriesView.as_view(), name='program-categories-public'),
     
-    # Program favorite endpoints
+    # Include all router URLs
+    path('', include(router.urls)),
+    path('', include(programs_router.urls)),
+    path('', include(users_router.urls)),
+    
+    # Program favorites
     path('programs/', include(program_favorite_urls)),
+    
+    # Newsletter endpoints
+    path('newsletter-subscriptions/', include(newsletter_subscription_urls)),
     
     # Contact form
     path('contact/', MessageContactViewSet.as_view({'post': 'create'}), name='contact'),
@@ -85,9 +108,9 @@ urlpatterns += [
          name='token_blacklist'),
     
     # Newsletter endpoints
-    path('newsletter/confirm/', 
-         NewsletterSubscriptionViewSet.as_view({'post': 'confirm'}), 
-         name='newsletter-confirm'),
+    path('newsletter-subscriptions/<str:email>/status/', 
+         NewsletterSubscriptionViewSet.as_view({'get': 'status'}), 
+         name='newsletter-status'),
     
     # Program actions
     path('programs/featured/', 

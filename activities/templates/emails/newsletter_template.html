@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ email.subject }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #eeeeee;
+            margin-bottom: 20px;
+        }
+        .content {
+            padding: 20px 0;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eeeeee;
+            font-size: 12px;
+            color: #777777;
+            text-align: center;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .program {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #eeeeee;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ email.subject }}</h1>
+    </div>
+    
+    <div class="content">
+        {{ email.content|safe }}
+        
+        {% if email.programs.exists %}
+            <h2>Featured Programs</h2>
+            {% for program in email.programs.all %}
+                <div class="program">
+                    <h3>{{ program.title }}</h3>
+                    <p>{{ program.description|truncatewords:50 }}</p>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+    
+    <div class="footer">
+        <p>You're receiving this email because you subscribed to our newsletter.</p>
+        <p>
+            <a href="{{ unsubscribe_url }}" style="color: #4CAF50;">Unsubscribe</a> | 
+            <a href="{{ site_url }}" style="color: #4CAF50;">Visit our website</a>
+        </p>
+        <p>© {% now "Y" %} SAF. All rights reserved.</p>
+    </div>
+</body>
+</html>

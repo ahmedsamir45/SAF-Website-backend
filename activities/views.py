@@ -72,6 +72,40 @@ class ProgramViewSet(viewsets.ModelViewSet):
     serializer_class = ProgramSerializer
     ordering_fields = ['post_date', 'start_date', 'end_date', 'title']
     ordering = ['-post_date']  # Default ordering
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+        
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        program = serializer.save()
+        
+        # Handle requirements if provided
+        requirements_data = request.data.get('requirements', [])
+        if requirements_data and isinstance(requirements_data, list):
+            program.requirements.set(requirements_data)
+            
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        program = serializer.save()
+        
+        # Handle requirements if provided
+        if 'requirements' in request.data:
+            requirements_data = request.data.get('requirements', [])
+            if isinstance(requirements_data, list):
+                program.requirements.set(requirements_data)
+        
+        return Response(serializer.data)
     
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def favorite(self, request, pk=None):

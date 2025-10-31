@@ -1,31 +1,93 @@
-asgiref==3.8.1
-certifi==2025.1.31
-cffi==1.17.1
-charset-normalizer==3.4.1
-cryptography==44.0.2
-defusedxml==0.7.1
-Django==5.1.7
-django-cors-headers==4.7.0
-django-filter==25.1
-django-phonenumber-field==8.1.0
-djangorestframework==3.15.2
-djangorestframework_simplejwt==5.5.0
-djoser==2.3.1
-drf-nested-routers==0.94.1
-idna==3.10
-oauthlib==3.2.2
-phonenumbers==9.0.4
-pillow==11.2.1
-psycopg2-binary==2.9.10
-pycparser==2.22
-PyJWT==2.9.0
-python-dotenv==1.1.0
-python3-openid==3.2.0
-requests==2.32.3
+# -----------------------------
+# CORE
+# -----------------------------
+Django==5.0.3
+djangorestframework==3.14.0
+python-dotenv==1.0.0
+Pillow==10.4.0
+
+# -----------------------------
+# DATABASE
+# -----------------------------
+psycopg2-binary==2.9.9
+dj-database-url==2.1.0
+
+# -----------------------------
+# AUTHENTICATION
+# -----------------------------
+djangorestframework-simplejwt==5.3.1
+djoser==2.2.0
+PyJWT==2.8.0
+python-jose[cryptography]==3.3.0
+
+# -----------------------------
+# API DOCUMENTATION
+# -----------------------------
+drf-spectacular==0.26.3
+drf-nested-routers==0.93.4
+
+# -----------------------------
+# CORS
+# -----------------------------
+django-cors-headers==4.3.1
+
+# -----------------------------
+# PHONE NUMBER
+# -----------------------------
+django-phonenumber-field==7.2.0
+phonenumbers==8.13.27
+
+# -----------------------------
+# FILTERING
+# -----------------------------
+django-filter==24.1
+
+# -----------------------------
+# STATIC FILES
+# -----------------------------
+whitenoise==6.6.0
+
+# -----------------------------
+# ASGI / WSGI
+# -----------------------------
+gunicorn==22.0.0
+uvicorn==0.27.1
+
+# -----------------------------
+# EMAIL
+# -----------------------------
+sendgrid==6.11.0
+
+# -----------------------------
+# SECURITY
+# -----------------------------
+cryptography==42.0.5
+
+# -----------------------------
+# SOCIAL AUTH
+# -----------------------------
 requests-oauthlib==2.0.0
 social-auth-app-django==5.4.3
 social-auth-core==4.6.0
+
+# -----------------------------
+# WASMER SAFE PACKAGES
+# (Required by Koyeb — DO NOT REMOVE)
+# -----------------------------
+certifi
+setuptools==69.0.3
 sqlparse==0.5.3
+typing_extensions==4.15.0
 tzdata==2025.1
 urllib3==2.4.0
+six==1.17.0
+
+# -----------------------------
+# MISC
+# -----------------------------
+uritemplate==4.2.0
+rpds-py==0.28.0
+vine==5.1.0
+wcwidth==0.2.14
+
 drf-yasg==1.21.7

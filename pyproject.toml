@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "saf-backend"
+version = "0.1.0"
+description = "SAF Backend Django Application"
+requires-python = ">=3.11"
+dependencies = [
+    "Django>=5.0.3",
+    "djangorestframework>=3.14.0",
+    "python-dotenv>=1.0.0",
+    "Pillow>=10.1.0",
+    "psycopg2-binary>=2.9.9",
+    "dj-database-url>=2.1.0",
+    "python-decouple>=3.8",
+    "djangorestframework-simplejwt>=5.3.1",
+    "drf-yasg>=1.21.7",
+    "drf-spectacular>=0.26.3",
+    "drf-nested-routers>=0.93.4",
+    "django-cors-headers>=4.3.1",
+    "whitenoise>=6.6.0",
+    "uvicorn>=0.27.1",
+    "gunicorn>=22.0.0",
+    "sendgrid>=6.11.0",
+    "cryptography>=42.0.5"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-django>=4.5.0",
+    "black>=23.0.0",
+    "isort>=5.12.0"
+]
+
+[project.scripts]
+start = "uvicorn SAF_backend.asgi:application --host 0.0.0.0 --port 8080"
+
+[tool.setuptools]
+packages = ["SAF_backend"]
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+include = '\.pyi?$'
+
+[uvicorn]
+host = "0.0.0.0"
+port = 8080
+reload = true
+log_level = "info"
+
+[uvicorn.logging]
+format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+datefmt = "%Y-%m-%d %H:%M:%S %z"
