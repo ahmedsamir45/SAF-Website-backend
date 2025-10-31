@@ -4,8 +4,8 @@ Django settings for SAF_backend project.
 
 from pathlib import Path
 import os
+import sys
 from datetime import timedelta
-import os
 from dotenv import load_dotenv
 
 # Port configuration
@@ -147,42 +147,57 @@ WSGI_APPLICATION = 'SAF_backend.wsgi.application'
 
 # -------------------------------------------------------------------
 # DATABASE (SQLite)
-# Database
+# Database Configuration
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-# Default SQLite configuration for development
-DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(BASE_DIR, "db.sqlite3")}')
+# Default to PostgreSQL configuration
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-if DATABASE_URL_AVAILABLE:
+if not DATABASE_URL:
+    # Default PostgreSQL configuration if DATABASE_URL is not set
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'saf_db'),
+            'USER': os.getenv('DB_USER', 'postgres'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+            'OPTIONS': {
+                'connect_timeout': 5,
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 10,
+                'keepalives_count': 5,
+            },
+            'CONN_MAX_AGE': 600,  # 10 minutes persistent connections
+        }
+    }
+else:
+    # Use DATABASE_URL if provided (for production/Heroku/etc.)
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
-            ssl_require=os.getenv('DB_SSL', '').lower() == 'true'
+            ssl_require=os.getenv('DB_SSL', 'False').lower() == 'true'
         )
     }
     
-    # Configure database pool if using PostgreSQL
-    if 'postgresql' in DATABASE_URL:
-        DATABASES['default']['OPTIONS'] = {
-            'connect_timeout': 5,  # 5 seconds connection timeout
-            'keepalives': 1,  # Enable keepalive
-            'keepalives_idle': 30,  # How long connection can be idle
-            'keepalives_interval': 10,  # How often to send keepalive packets
-            'keepalives_count': 5,  # How many keepalive packets to send before dropping
+    # Add PostgreSQL-specific settings if using PostgreSQL
+    if 'postgresql' in DATABASE_URL or 'postgres' in DATABASE_URL:
+        DATABASES['default']['OPTIONS'] = DATABASES['default'].get('OPTIONS', {}) | {
+            'connect_timeout': 5,
+            'keepalives': 1,
+            'keepalives_idle': 30,
+            'keepalives_interval': 10,
+            'keepalives_count': 5,
         }
-else:
-    # Fallback to basic SQLite configuration if dj_database_url is not available
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-        }
-    }
 
-# Enable persistent connections
-DATABASES['default']['CONN_MAX_AGE'] = 60  # 60 seconds connection lifetime
+# Test database configuration (if needed)
+if 'test' in sys.argv or 'test_coverage' in sys.argv:
+    DATABASES['default']['ENGINE'] = 'django.db.backends.sqlite3'
+    DATABASES['default']['NAME'] = ':memory:'
 
 # -------------------------------------------------------------------
 # CUSTOM USER MODEL
