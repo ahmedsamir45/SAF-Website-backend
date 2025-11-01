@@ -4,8 +4,8 @@ Django settings for SAF_backend project.
 
 from pathlib import Path
 import os
+import sys
 from datetime import timedelta
-import os
 from dotenv import load_dotenv
 
 # Port configuration
@@ -36,29 +36,65 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-unsafe')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 
 # Base URL for generating absolute URLs
-# In production, this should be set to your domain (e.g., https://yourdomain.com)
-DEFAULT_URL = 'http://127.0.0.1:8000' if DEBUG else 'https://yourdomain.com'
+# Production domain
+DEFAULT_URL = 'https://safstudentactivtiesfamily.com'
 BASE_URL = os.getenv('BASE_URL', DEFAULT_URL)
 
-# Parse ALLOWED_HOSTS from environment variable or default to all
-ALLOWED_HOSTS = ['*']
+# Parse ALLOWED_HOSTS from environment variable or default to the domain
+ALLOWED_HOSTS = [
+    'safstudentactivtiesfamily.com',
+    'www.safstudentactivtiesfamily.com',
+    'localhost',
+    '127.0.0.1',
+    '[::1]',
+]
 # -------------------------------------------------------------------
 # CORS SETTINGS
 # -------------------------------------------------------------------
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
 # Security settings
-CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+CSRF_TRUSTED_ORIGINS = [
+    'https://safstudentactivtiesfamily.com',
+    'https://www.safstudentactivtiesfamily.com',
+]
+
+# Security Headers
+SECURE_SSL_REDIRECT = not DEBUG
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True') == 'True'
-SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'
-CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True') == 'True'
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
+
+# Development settings
+if DEBUG:
+    # Disable all security in development
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    SECURE_PROXY_SSL_HEADER = None
+    SECURE_SSL_REDIRECT = False
+    SECURE_REDIRECT_EXEMPT = [r'^']  # Disable all redirects
+else:
+    # Production settings
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True') == 'True'
+    SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'
+    CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True') == 'True'
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_BROWSER_XSS_FILTER = True
@@ -147,42 +183,57 @@ WSGI_APPLICATION = 'SAF_backend.wsgi.application'
 
 # -------------------------------------------------------------------
 # DATABASE (SQLite)
-# Database
+# Database Configuration
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-# Default SQLite configuration for development
-DATABASE_URL = os.getenv('DATABASE_URL', f'sqlite:///{os.path.join(BASE_DIR, "db.sqlite3")}')
+# Default to PostgreSQL configuration
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-if DATABASE_URL_AVAILABLE:
+if not DATABASE_URL:
+    # Default PostgreSQL configuration if DATABASE_URL is not set
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'saf_db'),
+            'USER': os.getenv('DB_USER', 'postgres'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+            'OPTIONS': {
+                'connect_timeout': 5,
+                'keepalives': 1,
+                'keepalives_idle': 30,
+                'keepalives_interval': 10,
+                'keepalives_count': 5,
+            },
+            'CONN_MAX_AGE': 600,  # 10 minutes persistent connections
+        }
+    }
+else:
+    # Use DATABASE_URL if provided (for production/Heroku/etc.)
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
-            ssl_require=os.getenv('DB_SSL', '').lower() == 'true'
+            ssl_require=os.getenv('DB_SSL', 'False').lower() == 'true'
         )
     }
     
-    # Configure database pool if using PostgreSQL
-    if 'postgresql' in DATABASE_URL:
-        DATABASES['default']['OPTIONS'] = {
-            'connect_timeout': 5,  # 5 seconds connection timeout
-            'keepalives': 1,  # Enable keepalive
-            'keepalives_idle': 30,  # How long connection can be idle
-            'keepalives_interval': 10,  # How often to send keepalive packets
-            'keepalives_count': 5,  # How many keepalive packets to send before dropping
+    # Add PostgreSQL-specific settings if using PostgreSQL
+    if 'postgresql' in DATABASE_URL or 'postgres' in DATABASE_URL:
+        DATABASES['default']['OPTIONS'] = DATABASES['default'].get('OPTIONS', {}) | {
+            'connect_timeout': 5,
+            'keepalives': 1,
+            'keepalives_idle': 30,
+            'keepalives_interval': 10,
+            'keepalives_count': 5,
         }
-else:
-    # Fallback to basic SQLite configuration if dj_database_url is not available
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-        }
-    }
 
-# Enable persistent connections
-DATABASES['default']['CONN_MAX_AGE'] = 60  # 60 seconds connection lifetime
+# Test database configuration (if needed)
+if 'test' in sys.argv or 'test_coverage' in sys.argv:
+    DATABASES['default']['ENGINE'] = 'django.db.backends.sqlite3'
+    DATABASES['default']['NAME'] = ':memory:'
 
 # -------------------------------------------------------------------
 # CUSTOM USER MODEL
@@ -322,11 +373,20 @@ USE_TZ = True
 
 # -------------------------------------------------------------------
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# WhiteNoise configuration for serving static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Create static directory if it doesn't exist
 os.makedirs(os.path.join(BASE_DIR, 'static'), exist_ok=True)
@@ -348,13 +408,15 @@ FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 # -------------------------------------------------------------------
 # Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'safstudentactivtiesfamily.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '465'))  # 465 for SSL, 587 for TLS
+EMAIL_USE_SSL = True  # Use SSL for port 465
+# EMAIL_USE_TLS = True  # Uncomment this and comment above if using port 587
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'info@safstudentactivtiesfamily.com')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@yourdomain.com')
-ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@example.com')  # Add this line
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'info@safstudentactivtiesfamily.com')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL  # For error messages
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'info@safstudentactivtiesfamily.com')
 
 # -------------------------------------------------------------------
 # DEFAULTS
