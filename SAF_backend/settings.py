@@ -36,29 +36,65 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-unsafe')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = os.getenv('DJANGO_DEBUG', 'False').lower() == 'true'
 
 # Base URL for generating absolute URLs
-# In production, this should be set to your domain (e.g., https://yourdomain.com)
-DEFAULT_URL = 'http://127.0.0.1:8000' if DEBUG else 'https://yourdomain.com'
+# Production domain
+DEFAULT_URL = 'https://safstudentactivtiesfamily.com'
 BASE_URL = os.getenv('BASE_URL', DEFAULT_URL)
 
-# Parse ALLOWED_HOSTS from environment variable or default to all
-ALLOWED_HOSTS = ['*']
+# Parse ALLOWED_HOSTS from environment variable or default to the domain
+ALLOWED_HOSTS = [
+    'safstudentactivtiesfamily.com',
+    'www.safstudentactivtiesfamily.com',
+    'localhost',
+    '127.0.0.1',
+    '[::1]',
+]
 # -------------------------------------------------------------------
 # CORS SETTINGS
 # -------------------------------------------------------------------
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
 # Security settings
-CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+CSRF_TRUSTED_ORIGINS = [
+    'https://safstudentactivtiesfamily.com',
+    'https://www.safstudentactivtiesfamily.com',
+]
+
+# Security Headers
+SECURE_SSL_REDIRECT = not DEBUG
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True') == 'True'
-SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'
-CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True') == 'True'
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
+
+# Development settings
+if DEBUG:
+    # Disable all security in development
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    SECURE_PROXY_SSL_HEADER = None
+    SECURE_SSL_REDIRECT = False
+    SECURE_REDIRECT_EXEMPT = [r'^']  # Disable all redirects
+else:
+    # Production settings
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True') == 'True'
+    SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'
+    CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True') == 'True'
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_BROWSER_XSS_FILTER = True
@@ -337,11 +373,20 @@ USE_TZ = True
 
 # -------------------------------------------------------------------
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# WhiteNoise configuration for serving static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Create static directory if it doesn't exist
 os.makedirs(os.path.join(BASE_DIR, 'static'), exist_ok=True)
@@ -363,13 +408,15 @@ FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 # -------------------------------------------------------------------
 # Email Configuration
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'safstudentactivtiesfamily.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '465'))  # 465 for SSL, 587 for TLS
+EMAIL_USE_SSL = True  # Use SSL for port 465
+# EMAIL_USE_TLS = True  # Uncomment this and comment above if using port 587
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'info@safstudentactivtiesfamily.com')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@yourdomain.com')
-ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@example.com')  # Add this line
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'info@safstudentactivtiesfamily.com')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL  # For error messages
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'info@safstudentactivtiesfamily.com')
 
 # -------------------------------------------------------------------
 # DEFAULTS
