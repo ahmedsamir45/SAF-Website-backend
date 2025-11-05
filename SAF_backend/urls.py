@@ -71,16 +71,4 @@ urlpatterns = [
 ]
 
 # Add media URL patterns in development or when DEBUG is True
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-else:
-    # In production, use the following pattern
-    urlpatterns += [
-        re_path(r'^media/(?P<path>.*)$', static_serve, {'document_root': settings.MEDIA_ROOT}),
-    ]
-
-# ========================
-# Media Files (Development)
-# ========================
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
