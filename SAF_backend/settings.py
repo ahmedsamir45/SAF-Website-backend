@@ -40,8 +40,9 @@ DEBUG = False
 
 # Base URL for generating absolute URLs
 # Production domain
-DEFAULT_URL = 'https://safstudentactivtiesfamily.com'
+DEFAULT_URL = 'https://selfish-dedra-ahmedsamir3bass-a06d47e8.koyeb.app'
 BASE_URL = os.getenv('BASE_URL', DEFAULT_URL)
+MEDIA_BASE_URL = "https://selfish-dedra-ahmedsamir3bass-a06d47e8.koyeb.app"
 
 # Parse ALLOWED_HOSTS from environment variable or default to the domain
 ALLOWED_HOSTS = ["*"]
