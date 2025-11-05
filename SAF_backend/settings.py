@@ -44,29 +44,24 @@ DEFAULT_URL = 'https://safstudentactivtiesfamily.com'
 BASE_URL = os.getenv('BASE_URL', DEFAULT_URL)
 
 # Parse ALLOWED_HOSTS from environment variable or default to the domain
-ALLOWED_HOSTS = [
-    'safstudentactivtiesfamily.com',
-    'www.safstudentactivtiesfamily.com',
-    'localhost',
-    '127.0.0.1',
-    '[::1]',
-]
+ALLOWED_HOSTS = ["*"]
+
 # -------------------------------------------------------------------
 # CORS SETTINGS
 # -------------------------------------------------------------------
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
+CORS_ALLOW_ALL_ORIGINS = True
 # Security settings
-CSRF_TRUSTED_ORIGINS = [
-    'https://safstudentactivtiesfamily.com',
-    'https://www.safstudentactivtiesfamily.com',
-]
+# CSRF_TRUSTED_ORIGINS = [
+#     'https://safstudentactivtiesfamily.com',
+#     'https://www.safstudentactivtiesfamily.com',
+# ]
 
 # Security Headers
 SECURE_SSL_REDIRECT = not DEBUG
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = False
 SECURE_BROWSER_XSS_FILTER = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -74,31 +69,7 @@ SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
-# Development settings
-if DEBUG:
-    # Disable all security in development
-    SESSION_COOKIE_SECURE = False
-    CSRF_COOKIE_SECURE = False
-    SECURE_SSL_REDIRECT = False
-    SECURE_HSTS_SECONDS = 0
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-    SECURE_HSTS_PRELOAD = False
-    SECURE_PROXY_SSL_HEADER = None
-    SECURE_SSL_REDIRECT = False
-    SECURE_REDIRECT_EXEMPT = [r'^']  # Disable all redirects
-else:
-    # Production settings
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True') == 'True'
-    SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True') == 'True'
-    CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True') == 'True'
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_REFERRER_POLICY = 'same-origin'
+
 
 DEFAULT_CSRF_ORIGINS = [
     '*',
@@ -111,12 +82,11 @@ DEFAULT_CORS_ORIGINS = [
     'http://127.0.0.1:3000',
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://*.koyeb.app',
-]
 
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', ','.join(DEFAULT_CORS_ORIGINS)).split(',')
-CORS_ALLOW_CREDENTIALS = True
+
+
+CORS_ALLOW_CREDENTIALS = False
+
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
