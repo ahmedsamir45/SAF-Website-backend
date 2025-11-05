@@ -1,12 +1,11 @@
-# Use an official Python runtime as a parent image
+# Use official Python
 FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONPATH /app
+# Environment vars
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Set work directory
+# Work directory
 WORKDIR /app
 
 # Install system dependencies
@@ -19,14 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
+# Copy the project
 COPY . .
 
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
-# Expose the port the app runs on
+# Expose port
 EXPOSE 8000
 
-# Command to run the application in development mode with auto-reload
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000", "--insecure"]
+# Use Gunicorn for production
+CMD ["gunicorn", "SAF_backend.wsgi:application", "--bind", "0.0.0.0:8000"]

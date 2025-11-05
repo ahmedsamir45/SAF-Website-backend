@@ -70,5 +70,7 @@ urlpatterns = [
     ])),
 ]
 
-# Add media URL patterns in development or when DEBUG is True
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# Media files
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
