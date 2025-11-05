@@ -70,7 +70,13 @@ urlpatterns = [
     ])),
 ]
 
+# Static files (always served by Django in dev)
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # Media files
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+else:
+    urlpatterns += [
+        re_path(r'^media/(?P<path>.*)$', static_serve, {'document_root': settings.MEDIA_ROOT})
+    ]
